@@ -1,26 +1,279 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset='utf-8'/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Flashcard Generator - Upload</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --success: #10b981;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+      color: var(--gray-900);
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .upload-area {
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+
+    .file-drop {
+      border: 3px dashed var(--gray-200);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      background: var(--gray-100);
+      margin-bottom: 1.5rem;
+    }
+
+    .file-drop.dragover {
+      border-color: var(--primary);
+      background: #eef2ff;
+      transform: scale(1.02);
+    }
+
+    .file-drop p {
+      color: var(--gray-700);
+      margin-top: 1rem;
+      font-size: 1.1rem;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .custom-file-upload {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: var(--primary);
+      color: white;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 1rem;
+    }
+
+    .custom-file-upload:hover {
+      background: var(--primary-dark);
+    }
+
+    button[type="submit"] {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 1rem;
+    }
+
+    button[type="submit"]:hover {
+      background: var(--primary-dark);
+    }
+
+    button[type="submit"]:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    #result {
+      margin: 2rem;
+      padding: 1.5rem;
+      background: #f9fafb;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .loading {
+      display: none;
+      margin-top: 1.5rem;
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .success-message {
+      color: var(--success);
+      font-weight: 600;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .upload-area { padding: 2rem 1rem; }
+      h1 { font-size: 1.5rem; }
+    }
+  </style>
 </head>
 <body>
-  <h1>Upload Notes to Generate Flashcards</h1>
-  <form id="uploadForm" enctype="multipart/form-data">
-    <input type="file" name="file" id="fileInput" />
-    <button type="submit">Upload</button>
-  </form>
-  <pre id="result"></pre>
+  <div class="container">
+    <header>
+      <h1>Upload Notes to Generate Flashcards</h1>
+    </header>
+
+    <div class="upload-area">
+      <form id="uploadForm" enctype="multipart/form-data">
+        <div class="file-drop" id="fileDrop">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin: 0 auto;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <p>Drag & drop your notes here, or click to select</p>
+        </div>
+        <input type="file" name="file" id="fileInput" />
+        <label for="fileInput" class="custom-file-upload">Choose File</label>
+        <br/>
+        <button type="submit" id="submitBtn">Upload & Generate</button>
+      </form>
+
+      <div class="loading" id="loading">Uploading and generating flashcards...</div>
+      <div class="success-message" id="successMsg">Flashcards generated successfully!</div>
+
+      <pre id="result"></pre>
+    </div>
+  </div>
+
   <script>
-    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const fileDrop = document.getElementById('fileDrop');
+    const submitBtn = document.getElementById('submitBtn');
+    const result = document.getElementById('result');
+    const loading = document.getElementById('loading');
+    const successMsg = document.getElementById('successMsg');
+
+    // Drag & drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      fileDrop.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
       e.preventDefault();
-      const f = document.getElementById('fileInput').files[0];
-      if(!f){ alert('Choose a file'); return; }
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      fileDrop.addEventListener(eventName, () => fileDrop.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      fileDrop.addEventListener(eventName, () => fileDrop.classList.remove('dragover'), false);
+    });
+
+    fileDrop.addEventListener('drop', handleDrop, false);
+    fileDrop.addEventListener('click', () => fileInput.click());
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        updateFileName(files[0].name);
+      }
+    }
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        updateFileName(fileInput.files[0].name);
+      }
+    });
+
+    function updateFileName(name) {
+      fileDrop.querySelector('p').textContent = `Selected: ${name}`;
+    }
+
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('Please choose a file');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      loading.classList.add('show');
+      result.style.display = 'none';
+      successMsg.classList.remove('show');
+
       const fd = new FormData();
-      fd.append('file', f);
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
-      const json = await res.json();
-      document.getElementById('result').textContent = JSON.stringify(json, null, 2);
+      fd.append('file', file);
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const json = await res.json();
+
+        result.textContent = JSON.stringify(json, null, 2);
+        result.style.display = 'block';
+        successMsg.classList.add('show');
+      } catch (err) {
+        result.textContent = 'Error: ' + err.message;
+        result.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        loading.classList.remove('show');
+      }
     });
   </script>
 </body>
