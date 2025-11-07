@@ -1,7 +1,7 @@
 fastapi==0.95.2
 uvicorn==0.22.0
-transformers==4.35.0
-torch==2.2.0
+transformers==4.57.1
+torch==2.9.0
 
 keybert==0.7.0
 sentence-transformers==2.2.2
