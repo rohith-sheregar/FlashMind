@@ -5,9 +5,21 @@ import logging
 from pathlib import Path
 
 try:
-    from backend_flask.config import MONGO_URI, MONGO_DB_NAME, MONGO_COLLECTION, GENERATED_DIR
+    from backend_flask.config import (
+        MONGO_URI,
+        MONGO_DB_NAME,
+        MONGO_COLLECTION,
+        GENERATED_DIR,
+        ENABLE_FILE_DB,
+    )
 except ModuleNotFoundError:
-    from config import MONGO_URI, MONGO_DB_NAME, MONGO_COLLECTION, GENERATED_DIR
+    from config import (
+        MONGO_URI,
+        MONGO_DB_NAME,
+        MONGO_COLLECTION,
+        GENERATED_DIR,
+        ENABLE_FILE_DB,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +70,12 @@ def list_generated_mongo(limit: int = 100):
 
 
 def save_generated_file(record: dict):
+    if not ENABLE_FILE_DB:
+        # File-backed DB disabled by configuration; pretend to succeed but do
+        # not create files on disk. Return a sentinel indicating file DB is
+        # disabled so callers can handle it if needed.
+        return None
+
     os.makedirs(Path(GENERATED_DIR), exist_ok=True)
     # append as jsonl
     with open(DB_FILE, 'a', encoding='utf-8') as f:
@@ -67,6 +85,10 @@ def save_generated_file(record: dict):
 
 def list_generated_file(limit: int = 100):
     out = []
+    if not ENABLE_FILE_DB:
+        # File DB disabled, return empty set
+        return out
+
     if not DB_FILE.exists():
         return out
     with open(DB_FILE, 'r', encoding='utf-8') as f:
@@ -90,14 +112,24 @@ def save_generated(record: dict):
     """
     rec = dict(record)
     rec.setdefault('created_at', datetime.datetime.utcnow())
+    # Prefer Mongo if available. Only fall back to file if explicitly enabled
+    # via configuration (ENABLE_FILE_DB). This avoids creating repo files by
+    # default on machines without Mongo.
     if _mongo_available:
         try:
             return save_generated_mongo(rec)
         except Exception as e:
-            logger.warning('Mongo save failed, falling back to file: %s', e)
-            return save_generated_file(rec)
+            logger.warning('Mongo save failed')
+            if ENABLE_FILE_DB:
+                logger.warning('Falling back to file DB: %s', e)
+                return save_generated_file(rec)
+            logger.warning('File DB disabled; not persisting generated record')
+            return None
     else:
-        return save_generated_file(rec)
+        if ENABLE_FILE_DB:
+            return save_generated_file(rec)
+        logger.info('Mongo not available and file DB is disabled; not saving record')
+        return None
 
 
 def list_generated(limit: int = 100):

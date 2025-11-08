@@ -18,21 +18,29 @@ from typing import Any, Dict, List, Optional, Tuple
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
+# Import config and services. Support both package execution and script
+# execution (when __package__ is None). Prefer package imports but fall
+# back to local imports when running `python app.py` from inside the
+# `backend_flask` directory.
 try:
     from backend_flask import config as config_mod
     from backend_flask.services import file_service, db_service
-except Exception:
-    # When running modules directly from the backend_flask folder (not installed as a package),
-    # fall back to local imports.
-    try:
-        import config as config_mod
-        from services import file_service, db_service
-    except Exception:
-        # As a last resort, raise an informative error
-        raise
+except ModuleNotFoundError:
+    # Running as a script from within backend_flask/ -- import locally.
+    import config as config_mod
+    from services import file_service, db_service
 
-# Defer importing the ML model manager until needed to avoid heavy imports at module import time.
-model_manager_module = None
+# Import the ML model manager from the sibling `ml_service` package when
+# available. Only fallback to a bare `models` import when the module itself
+# is not found (ModuleNotFoundError). Do NOT catch other exceptions here
+# (e.g., runtime issues inside the ML package) so that those errors surface
+# clearly instead of causing a confusing fallback import error.
+try:
+    from ml_service.models import model_manager as model_manager_module
+except ModuleNotFoundError:
+    # ML service not installed/available. Use None and let callers handle
+    # missing ModelManager (upload code already handles mgr==None).
+    model_manager_module = None
 
 import requests
 

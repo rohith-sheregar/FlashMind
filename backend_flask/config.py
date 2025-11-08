@@ -27,3 +27,6 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() in ('1', 'true', 'yes')
 
 # Misc
 DEFAULT_PAGE_SIZE = int(os.environ.get('DEFAULT_PAGE_SIZE', 50))
+# Whether to persist generated records to a local JSONL file when Mongo is
+# unavailable. Default: False to avoid creating repo files during local dev.
+ENABLE_FILE_DB = os.environ.get('ENABLE_FILE_DB', 'False').lower() in ('1', 'true', 'yes')

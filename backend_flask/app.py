@@ -2,13 +2,20 @@ from flask import Flask
 import os
 import logging
 
-# Support running as a package (python -m backend_flask.app) and as a script
+# Allow running the module two ways:
+# 1) as a package: `python -m backend_flask.app` (preferred)
+# 2) as a script from inside the package folder: `python app.py`
+#
+# Relative imports (leading dot) require package context. When the file is
+# executed directly as a script, __package__ may be None and relative imports
+# raise ImportError. Try the package-relative imports first and fall back to
+# local imports when running as a script.
 try:
-    from backend_flask.routes.upload_routes import upload_bp
-    from backend_flask.routes.flashcard_routes import flashcard_bp
-    from backend_flask.config import UPLOAD_DIR, GENERATED_DIR, HOST, PORT, DEBUG
-except ModuleNotFoundError:
-    # fallback when running `python app.py` from inside backend_flask/
+    from .routes.upload_routes import upload_bp
+    from .routes.flashcard_routes import flashcard_bp
+    from .config import UPLOAD_DIR, GENERATED_DIR, HOST, PORT, DEBUG
+except (ImportError, ModuleNotFoundError):
+    # Running as a script (no package). Import from local module paths.
     from routes.upload_routes import upload_bp
     from routes.flashcard_routes import flashcard_bp
     from config import UPLOAD_DIR, GENERATED_DIR, HOST, PORT, DEBUG

@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+# Support both package and script execution
 try:
     from backend_flask.services import db_service
     from backend_flask.config import DEFAULT_PAGE_SIZE

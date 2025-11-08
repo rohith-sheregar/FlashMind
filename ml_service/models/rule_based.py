@@ -1,27 +1,56 @@
-"""Rule-based flashcard generation with enhanced features."""
+"""Rule-based flashcard generation with enhanced features.
+
+This module avoids heavy NLTK top-level imports so that importing the
+package doesn't attempt to download or access nltk data (which can cause
+LookupError on systems without the corpora). Imports are performed lazily
+inside functions and fall back to simple heuristics when NLTK isn't
+available or data is missing.
+"""
 import re
-import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-from nltk.tag import pos_tag
+from typing import List, Dict
 
-try:
-    nltk.download('punkt')
-    nltk.download('averaged_perceptron_tagger')
-    nltk.download('stopwords')
-except Exception:
-    print("Warning: NLTK data download failed. Basic tokenization will be used.")
 
-def preprocess_text(text: str) -> list[str]:
-    """Split text into clean sentences."""
+def _safe_sent_tokenize(text: str) -> List[str]:
     try:
-        sentences = sent_tokenize(text)
+        from nltk.tokenize import sent_tokenize
+        return sent_tokenize(text)
     except Exception:
-        # Fallback to basic splitting
-        sentences = [s.strip() for s in re.split(r'[.!?]+', text)]
+        # Fallback basic sentence splitter
+        return [s.strip() for s in re.split(r'[.!?]+', text) if s.strip()]
+
+
+def _safe_word_tokenize(sentence: str) -> List[str]:
+    try:
+        from nltk.tokenize import word_tokenize
+        return word_tokenize(sentence)
+    except Exception:
+        return re.findall(r"\b\w+\b", sentence)
+
+
+def _safe_pos_tag(words: List[str]):
+    try:
+        from nltk import pos_tag
+        return pos_tag(words)
+    except Exception:
+        # Return naive noun tagging: mark words longer than 2 chars as nouns
+        return [(w, 'NN') for w in words]
+
+
+def _safe_stopwords_set():
+    try:
+        from nltk.corpus import stopwords
+        return set(stopwords.words('english'))
+    except Exception:
+        return set()
+
+
+def preprocess_text(text: str) -> List[str]:
+    """Split text into clean sentences."""
+    sentences = _safe_sent_tokenize(text)
     return [s.strip() for s in sentences if len(s.strip()) > 20]
 
-def extract_definition_sentences(sentences: list[str]) -> list[dict]:
+
+def extract_definition_sentences(sentences: List[str]) -> List[Dict]:
     """Identify sentences that contain definitions or key concepts."""
     definition_patterns = [
         r'\bis\s+(?:defined\s+as|called|known\s+as)\b',
@@ -45,36 +74,33 @@ def extract_definition_sentences(sentences: list[str]) -> list[dict]:
                 break
     return definitions
 
-def extract_key_terms(text: str, sentence: str) -> list[str]:
+
+def extract_key_terms(text: str, sentence: str) -> List[str]:
     """Extract potential key terms from the sentence."""
     try:
-        words = word_tokenize(sentence)
-        tagged = pos_tag(words)
-        # Focus on nouns and noun phrases
+        words = _safe_word_tokenize(sentence)
+        tagged = _safe_pos_tag(words)
         key_terms = []
-        stop_words = set(stopwords.words('english'))
-        
+        stop_words = _safe_stopwords_set()
+
         for i, (word, tag) in enumerate(tagged):
-            # Get nouns and proper nouns
             if tag.startswith('NN') and word.lower() not in stop_words:
-                # Check for compound nouns
                 if i > 0 and tagged[i-1][1].startswith('JJ'):
                     key_terms.append(f"{tagged[i-1][0]} {word}")
                 else:
                     key_terms.append(word)
-        
-        return list(set(key_terms))[:5]
+
+        return list(dict.fromkeys(key_terms))[:5]
     except Exception:
-        # Fallback to basic word extraction
-        words = re.findall(r'\b\w+\b', sentence)
+        words = re.findall(r"\b\w+\b", sentence)
         return [w for w in words if len(w) > 3][:5]
 
-def enhanced_rule_based_generate(text: str, max_q: int = 5) -> list[dict]:
+
+def enhanced_rule_based_generate(text: str, max_q: int = 5) -> List[Dict]:
     """Generate flashcards using enhanced rule-based approach."""
     sentences = preprocess_text(text)
-    flashcards = []
-    
-    # First, look for definition-style sentences
+    flashcards: List[Dict] = []
+
     definitions = extract_definition_sentences(sentences)
     for d in definitions[:max_q]:
         flashcards.append({
@@ -82,29 +108,24 @@ def enhanced_rule_based_generate(text: str, max_q: int = 5) -> list[dict]:
             'answer': d['definition'],
             'keywords': extract_key_terms(text, d['sentence'])
         })
-    
-    # If we need more cards, generate from remaining sentences
+
     remaining = max_q - len(flashcards)
     if remaining > 0:
-        # Filter out sentences already used in definitions
         used_sents = set(d['sentence'] for d in definitions)
         other_sents = [s for s in sentences if s not in used_sents]
-        
+
         for sent in other_sents[:remaining]:
-            # Try to form a specific question based on sentence structure
             key_terms = extract_key_terms(text, sent)
             if key_terms:
-                # Use the first key term to form a question
                 main_term = key_terms[0]
                 question = f"What is important to know about {main_term}?"
             else:
-                # Fallback to generic question
                 question = "What is the main idea expressed in this statement?"
-            
+
             flashcards.append({
                 'question': question,
                 'answer': sent,
                 'keywords': key_terms
             })
-    
+
     return flashcards
