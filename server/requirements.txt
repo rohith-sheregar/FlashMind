@@ -1,8 +1,13 @@
+python-docx
 fastapi
 uvicorn
 sqlalchemy
 pydantic
+pydantic_settings
+pypdf
 python-dotenv
 python-multipart
 passlib[bcrypt]
 python-jose[cryptography]
+torch 
+transformers
