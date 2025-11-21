@@ -16,9 +16,8 @@ class LLMService:
                     model_kwargs={
                         "do_sample": True, 
                         "temperature": 0.1, 
-                        # CRITICAL: High penalty prevents the model from using the same words twice
                         "repetition_penalty": 2.0, 
-                        "no_repeat_ngram_size": 3 # Hard block on repeating 3-word phrases
+                        "no_repeat_ngram_size": 3
                     }
                 )
                 print("✅ Model loaded successfully.")
@@ -39,51 +38,46 @@ class LLMService:
         
         print(f"\n🤖 [RAW LLM OUTPUT]: {raw_output}\n") 
 
+        # --- FIX: ARTIFACT CLEANER ---
+        # Remove the specific tags BEFORE processing anything else
+        clean_text = raw_output.replace("[QUESTION_END]", "").replace("[ANSWER_END]", "").strip()
+        
         cards = []
 
-        # --- STRICT CLEANER LOGIC ---
-        
-        # 1. Identify the split between Question and Answer
-        # The model usually outputs: "Question? Answer."
-        if "?" in raw_output:
-            parts = raw_output.split("?")
+        # 1. Split by Question Mark
+        if "?" in clean_text:
+            parts = clean_text.split("?")
             
-            # Part 1: The Question (Before the ?)
+            # Question is everything before the ?
             question = parts[0].strip() + "?"
             
-            # Part 2: The Answer (After the ?)
-            # THE FIX: We take ONLY the first sentence of the answer.
-            # We split by "." and take the first part.
+            # Answer is everything after
             raw_answer_rest = " ".join(parts[1:]).strip()
             
+            # Take only the first sentence of the answer to keep it clean
             if "." in raw_answer_rest:
                 answer = raw_answer_rest.split(".")[0] + "."
             else:
-                # If there is no period, just take the first 100 chars to be safe
-                answer = raw_answer_rest[:100]
+                answer = raw_answer_rest
 
-            # Basic validation to ensure we don't save empty garbage
             if len(question) > 5 and len(answer) > 5:
                 cards.append({
                     "front": question,
                     "back": answer
                 })
         
-        # 2. Fallback: If no '?' found, try to regex search
+        # 2. Fallback Regex
         else:
-            # Look for "Question:" label explicitly
-            match = re.search(r"(?:Question|Q)[:\s]+(.*?)(?:Answer|A)[:\s]+(.*)", raw_output, re.IGNORECASE)
+            match = re.search(r"(?:Question|Q)[:\s]+(.*?)(?:Answer|A)[:\s]+(.*)", clean_text, re.IGNORECASE)
             if match:
                 q = match.group(1).strip()
                 a_full = match.group(2).strip()
-                # Again, strictly take only the first sentence of the answer
                 a_clean = a_full.split(".")[0] + "."
                 cards.append({"front": q, "back": a_clean})
 
-        # 3. Last Resort: Saving raw text (Truncated)
-        if not cards and len(raw_output) > 10:
-            # Just save the first sentence of the raw output
-            first_sentence = raw_output.split(".")[0] + "."
+        # 3. Last Resort
+        if not cards and len(clean_text) > 10:
+            first_sentence = clean_text.split(".")[0] + "."
             cards.append({
                 "front": "Key Concept",
                 "back": first_sentence
