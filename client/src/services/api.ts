@@ -1,13 +1,13 @@
 import axios from "axios";
 
 // DIRECT CONNECTION to the Backend
-const API_URL = "http://127.0.0.1:8000/api";
+export const API_URL = "http://127.0.0.1:8000/api";
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
-    // DO NOT Add Authorization Headers yet. The backend is public.
+    // Auth is optional for now; endpoints are public by default.
   },
   timeout: 30000, // 30s timeout
 });

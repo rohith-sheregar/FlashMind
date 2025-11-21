@@ -33,18 +33,15 @@ const FileDropzone: React.FC = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      console.log("Upload Success:", response.data);
-
       // 1. Save the ID we got from the backend
       setDeckId(response.data.deck_id);
       setStatus("success");
       setMessage("Flashcards generated successfully!");
-    } catch (error: any) {
-      console.error("Upload Failed:", error);
+    } catch (error: unknown) {
+      console.error("Upload failed:", error);
       setStatus("error");
       setMessage(
-        error.response?.data?.detail ||
-          "Connection Failed. Is the Backend running?"
+        error instanceof Error ? error.message : "Connection Failed. Is the Backend running?"
       );
     }
   };

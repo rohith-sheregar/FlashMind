@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import documents, decks
-from app.services.db_setup import engine, Base, SessionLocal # <--- Fixed Import
-from app.models import user, deck, flashcard 
-from app.models.user import User # <--- Fixed Import for seeding
+
+from app.api import documents, decks, auth
+from app.services.db_setup import engine, Base, SessionLocal  # <--- Fixed Import
+from app.models import user, deck, flashcard
+from app.models.user import User  # <--- Fixed Import for seeding
 
 # 1. Create Database Tables
 Base.metadata.create_all(bind=engine)
@@ -40,6 +41,7 @@ app.add_middleware(
 # 5. Mount Routers
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(decks.router, prefix="/api/decks", tags=["Decks"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 
 @app.get("/")
 def root():

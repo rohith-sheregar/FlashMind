@@ -3,6 +3,7 @@ export interface IFlashcard {
   question: string;
   answer: string;
   deck_id?: string; // Foreign key reference
+  fileId?: string; // Reference to uploaded file
 }
 
 export interface IDeck {

@@ -6,13 +6,13 @@ interface AppState {
   isGenerating: boolean;
 
   // Actions
-  setCurrentDeck: (deck: IDeck | null) => void;
-  setIsGenerating: (isGen: boolean) => void;
+  setCurrentDeck: (_deck: IDeck | null) => void;
+  setIsGenerating: (_isGenerating: boolean) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
   currentDeck: null,
   isGenerating: false,
-  setCurrentDeck: (deck) => set({ currentDeck: deck }),
-  setIsGenerating: (isGen) => set({ isGenerating: isGen }),
+  setCurrentDeck: (nextDeck) => set({ currentDeck: nextDeck }),
+  setIsGenerating: (nextState) => set({ isGenerating: nextState }),
 }));

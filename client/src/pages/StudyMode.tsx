@@ -28,15 +28,18 @@ const StudyMode = () => {
   useEffect(() => {
     const fetchDeck = async () => {
       try {
-        console.log(`🔍 Fetching Deck ID: ${deckId}...`);
-        // 2. Fetch from Backend
         const response = await api.get(`/decks/${deckId}`);
-
-        console.log("✅ Data Received:", response.data);
         setDeck(response.data);
-      } catch (err: any) {
-        console.error("❌ Fetch Error:", err);
-        setError("Could not load deck. Check backend logs.");
+      } catch (err: unknown) {
+        console.error("Failed to load deck:", err);
+        const fallbackMessage =
+          typeof err === "object" &&
+          err !== null &&
+          "message" in err &&
+          typeof (err as { message?: string }).message === "string"
+            ? (err as { message: string }).message
+            : "Could not load deck. Check backend logs.";
+        setError(fallbackMessage);
       } finally {
         setLoading(false);
       }
