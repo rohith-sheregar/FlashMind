@@ -12,4 +12,14 @@ const api = axios.create({
   timeout: 30000, // 30s timeout
 });
 
+export const getDecks = async () => {
+  const response = await api.get("/decks/");
+  return response.data;
+};
+
+export const getDeck = async (id: string) => {
+  const response = await api.get(`/decks/${id}`);
+  return response.data;
+};
+
 export default api;

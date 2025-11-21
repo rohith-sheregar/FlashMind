@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.services.db_setup import get_db
 from app.models.deck import Deck
@@ -23,3 +24,19 @@ def get_deck(deck_identifier: str, db: Session = Depends(get_db)):
         "title": deck.title,
         "cards": [{"front": c.question, "back": c.answer} for c in deck.cards]
     }
+
+@router.get("/")
+def get_decks(db: Session = Depends(get_db)):
+    # For now, we assume user_id = 1 as per the current auth/seeding logic
+    user_id = 1
+    decks = db.query(Deck).filter(Deck.user_id == user_id).all()
+    
+    return [
+        {
+            "id": deck.id,
+            "request_id": deck.request_id,
+            "title": deck.title,
+            "card_count": len(deck.cards)
+        }
+        for deck in decks
+    ]

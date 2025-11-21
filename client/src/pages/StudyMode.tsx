@@ -34,9 +34,9 @@ const StudyMode = () => {
         console.error("Failed to load deck:", err);
         const fallbackMessage =
           typeof err === "object" &&
-          err !== null &&
-          "message" in err &&
-          typeof (err as { message?: string }).message === "string"
+            err !== null &&
+            "message" in err &&
+            typeof (err as { message?: string }).message === "string"
             ? (err as { message: string }).message
             : "Could not load deck. Check backend logs.";
         setError(fallbackMessage);
@@ -47,6 +47,65 @@ const StudyMode = () => {
 
     if (deckId) fetchDeck();
   }, [deckId]);
+
+  // --- QUIZ STATE ---
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizData, setQuizData] = useState<any>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [cardsReviewed, setCardsReviewed] = useState(0);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [quizResult, setQuizResult] = useState<"correct" | "incorrect" | null>(null);
+
+  // --- QUIZ LOGIC ---
+  const handleNextCard = async () => {
+    const nextIndex = (currentCardIndex + 1) % deck!.cards.length;
+    const newReviewedCount = cardsReviewed + 1;
+    setCardsReviewed(newReviewedCount);
+
+    // Trigger quiz every 5 cards
+    if (newReviewedCount > 0 && newReviewedCount % 5 === 0) {
+      setQuizLoading(true);
+      setShowQuiz(true);
+
+      // Get last 5 cards for context
+      const recentCards = [];
+      for (let i = 0; i < 5; i++) {
+        const idx = (currentCardIndex - i + deck!.cards.length) % deck!.cards.length;
+        recentCards.push(deck!.cards[idx]);
+      }
+
+      try {
+        const response = await api.post("/quiz/generate", { cards: recentCards });
+        setQuizData(response.data);
+      } catch (error) {
+        console.error("Failed to generate quiz:", error);
+        setShowQuiz(false); // Skip quiz on error
+      } finally {
+        setQuizLoading(false);
+      }
+    } else {
+      setCurrentCardIndex(nextIndex);
+      setIsFlipped(false);
+    }
+  };
+
+  const handleQuizAnswer = (option: string) => {
+    setSelectedOption(option);
+    if (option === quizData.correct_answer) {
+      setQuizResult("correct");
+    } else {
+      setQuizResult("incorrect");
+    }
+  };
+
+  const closeQuiz = () => {
+    setShowQuiz(false);
+    setQuizData(null);
+    setSelectedOption(null);
+    setQuizResult(null);
+    setCurrentCardIndex((prev) => (prev + 1) % deck!.cards.length);
+    setIsFlipped(false);
+  };
 
   // --- RENDER STATES ---
 
@@ -80,11 +139,6 @@ const StudyMode = () => {
 
   const currentCard = deck.cards[currentCardIndex];
 
-  const nextCard = () => {
-    setIsFlipped(false);
-    setCurrentCardIndex((prev) => (prev + 1) % deck.cards.length);
-  };
-
   const prevCard = () => {
     setIsFlipped(false);
     setCurrentCardIndex(
@@ -93,15 +147,79 @@ const StudyMode = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-100 flex flex-col relative">
+      {/* Quiz Overlay */}
+      {showQuiz && (
+        <div className="absolute inset-0 z-50 bg-slate-900/90 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
+            {quizLoading ? (
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <p className="text-slate-600 font-medium">Generating Quiz...</p>
+              </div>
+            ) : quizData ? (
+              <div>
+                <h2 className="text-2xl font-bold text-slate-800 mb-6">Quick Quiz!</h2>
+                <p className="text-lg text-slate-700 mb-6">{quizData.question}</p>
+
+                <div className="space-y-3 mb-8">
+                  {Object.entries(quizData.options).map(([key, value]) => (
+                    <button
+                      key={key}
+                      onClick={() => !quizResult && handleQuizAnswer(key)}
+                      disabled={!!quizResult}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all
+                        ${selectedOption === key
+                          ? quizResult === "correct"
+                            ? "border-green-500 bg-green-50 text-green-700"
+                            : "border-red-500 bg-red-50 text-red-700"
+                          : "border-slate-200 hover:border-indigo-300 hover:bg-slate-50"
+                        }
+                        ${quizResult && key === quizData.correct_answer ? "border-green-500 bg-green-50 text-green-700" : ""}
+                      `}
+                    >
+                      <span className="font-bold mr-2">{key})</span> {value as string}
+                    </button>
+                  ))}
+                </div>
+
+                {quizResult && (
+                  <div className="flex items-center justify-between animate-in fade-in slide-in-from-bottom-4">
+                    <p className={`font-bold ${quizResult === "correct" ? "text-green-600" : "text-red-600"}`}>
+                      {quizResult === "correct" ? "🎉 Correct! Well done." : "Incorrect. The correct answer was " + quizData.correct_answer}
+                    </p>
+                    <button
+                      onClick={closeQuiz}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                    >
+                      Continue Studying
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-red-500 mb-4">Failed to load quiz.</p>
+                <button
+                  onClick={() => setShowQuiz(false)}
+                  className="px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300"
+                >
+                  Skip Quiz
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white shadow-sm p-4 flex items-center justify-between">
         <Link
-          to="/"
+          to="/study"
           className="flex items-center text-slate-600 hover:text-indigo-600 transition"
         >
           <ArrowLeft size={20} className="mr-2" />
-          Back to Upload
+          Back to Library
         </Link>
         <h1 className="font-bold text-lg text-slate-800">{deck.title}</h1>
         <div className="text-sm text-slate-500">
@@ -157,7 +275,7 @@ const StudyMode = () => {
           </button>
 
           <button
-            onClick={nextCard}
+            onClick={handleNextCard}
             className="p-3 rounded-full bg-white shadow hover:bg-slate-50 text-slate-700 transition"
           >
             <ChevronRight size={24} />
