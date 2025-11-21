@@ -11,3 +11,11 @@ passlib[bcrypt]
 python-jose[cryptography]
 torch 
 transformers
+pillow
+python-pptx
+striprtf
+markdown
+nltk
+spacy
+beautifulsoup4
+pytesseract
