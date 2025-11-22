@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import StreamingResponse
 from app.services.parser_service import ParserService
 from app.services.llm_service import LLMService
@@ -6,11 +6,13 @@ from app.services.db_setup import SessionLocal
 from app.models.deck import Deck
 from app.models.flashcard import Flashcard
 from app.models.user import User
+from app.api.auth import get_current_user
 import shutil
 import os
 import uuid
 import json
 import asyncio
+import time
 from typing import Generator
 
 router = APIRouter()
@@ -22,7 +24,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Store processing status
 processing_status = {}
 
-def process_document_task(file_path: str, deck_id: str, filename: str):
+def process_document_task(file_path: str, deck_id: str, filename: str, user_id: int):
     """Enhanced background task with better preprocessing and chunking"""
     print(f"⏳ [Background] Processing {filename} for Deck {deck_id}...")
     
@@ -67,7 +69,7 @@ def process_document_task(file_path: str, deck_id: str, filename: str):
         processing_status[deck_id]["progress"] = 30
 
         # 4. Create deck first
-        new_deck = Deck(title=f"FlashMind: {filename}", user_id=1, request_id=deck_id) 
+        new_deck = Deck(title=f"FlashMind: {filename}", user_id=user_id, request_id=deck_id) 
         db.add(new_deck)
         db.commit()
         db.refresh(new_deck)
@@ -85,6 +87,7 @@ def process_document_task(file_path: str, deck_id: str, filename: str):
                 for card_data in generated:
                     db_card = Flashcard(
                         deck_id=new_deck.id,
+                        user_id=user_id,
                         question=card_data.get('front', 'Unknown Question'),
                         answer=card_data.get('back', 'Unknown Answer')
                     )
@@ -124,7 +127,8 @@ def process_document_task(file_path: str, deck_id: str, filename: str):
 @router.post("/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
 ):
     print(f"➡️ [API] Received upload request: {file.filename}")
     
@@ -147,7 +151,10 @@ async def upload_document(
         # 1. Save file locally
         file_id = str(uuid.uuid4())
         ext = file.filename.split(".")[-1] if "." in file.filename else "txt"
-        file_path = os.path.join(UPLOAD_DIR, f"{file_id}.{ext}")
+        # Filename pattern: {user_id}_{timestamp}.pdf
+        timestamp = int(time.time())
+        safe_filename = f"{current_user.id}_{timestamp}.{ext}"
+        file_path = os.path.join(UPLOAD_DIR, safe_filename)
         
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -163,7 +170,7 @@ async def upload_document(
         }
 
         # 4. Queue the Task
-        background_tasks.add_task(process_document_task, file_path, temp_ref_id, file.filename)
+        background_tasks.add_task(process_document_task, file_path, temp_ref_id, file.filename, current_user.id)
 
         # 5. Return Success
         return {
@@ -178,7 +185,7 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status/{deck_id}")
-async def get_processing_status(deck_id: str):
+async def get_processing_status(deck_id: str, current_user: User = Depends(get_current_user)):
     """Get the processing status of a document"""
     if deck_id not in processing_status:
         raise HTTPException(status_code=404, detail="Processing ID not found")
@@ -186,7 +193,7 @@ async def get_processing_status(deck_id: str):
     return processing_status[deck_id]
 
 @router.get("/stream/{deck_id}")
-async def stream_flashcards(deck_id: str):
+async def stream_flashcards(deck_id: str, current_user: User = Depends(get_current_user)):
     """Stream flashcards and status updates as they are generated."""
 
     async def event_generator():
@@ -201,7 +208,7 @@ async def stream_flashcards(deck_id: str):
                 # Unknown processing id
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Processing ID not found'})}\n\n"
                 break
-
+            
             # Always send latest status
             yield f"data: {json.dumps({'type': 'status', 'data': status})}\n\n"
 
