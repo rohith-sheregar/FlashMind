@@ -1,9 +1,9 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import AuthPage from "./components/AuthPage";
+import Landing from "./pages/Landing";
 import FlashcardGenerator from "./pages/FlashcardGenerator";
 import StudyMode from "./pages/StudyMode";
-import StudySelection from "./pages/StudySelection";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -18,8 +18,18 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<FlashcardGenerator />} />
-      <Route path="/study" element={<StudySelection />} />
+      <Route
+        path="/"
+        element={
+          currentView === "landing" ? (
+            <Landing onNavigate={handleNavigate} />
+          ) : currentView === "flashcards" ? (
+            <FlashcardGenerator onBack={handleBack} />
+          ) : (
+            <Landing onNavigate={handleNavigate} />
+          )
+        }
+      />
       <Route path="/study/:deckId" element={<StudyMode />} />
     </Routes>
   );
