@@ -15,6 +15,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     name: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -26,12 +27,64 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    setError(null);
+
+    if (!isLogin && formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
       setIsLoading(false);
-      onAuthSuccess();
-    }, 1500);
+      return;
+    }
+
+    try {
+      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
+      const body = isLogin
+        ? new URLSearchParams({
+          username: formData.email,
+          password: formData.password,
+        })
+        : JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        });
+
+      const headers: HeadersInit = isLogin
+        ? { "Content-Type": "application/x-www-form-urlencoded" }
+        : { "Content-Type": "application/json" };
+
+      const response = await fetch(`http://localhost:8000${endpoint}`, {
+        method: "POST",
+        headers,
+        body,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.detail) {
+          // Handle Pydantic validation errors (array of errors)
+          if (Array.isArray(data.detail)) {
+            throw new Error(data.detail[0].msg);
+          }
+          throw new Error(data.detail);
+        }
+        throw new Error("Authentication failed");
+      }
+
+      if (isLogin) {
+        localStorage.setItem("token", data.access_token);
+        onAuthSuccess();
+      } else {
+        // Auto login after signup or switch to login mode
+        setIsLogin(true);
+        setError(null);
+        alert("Account created successfully! Please sign in.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleAuthMode = () => {
@@ -42,6 +95,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       confirmPassword: "",
       name: "",
     });
+    setError(null);
   };
 
   return (
@@ -69,21 +123,19 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           <div className="flex bg-gray-100 rounded-xl p-1 mb-8 relative overflow-hidden">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
-                isLogin
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${isLogin
                   ? "bg-white text-indigo-600 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
             >
               Sign In
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
-                !isLogin
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${!isLogin
                   ? "bg-white text-indigo-600 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
             >
               Sign Up
             </button>
@@ -92,15 +144,19 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           {/* Form */}
           <form
             onSubmit={handleSubmit}
-            className={`space-y-6 transition-transform duration-500 ${
-              isLogin ? "translate-x-0" : "-translate-x-0"
-            }`}
+            className={`space-y-6 transition-transform duration-500 ${isLogin ? "translate-x-0" : "-translate-x-0"
+              }`}
           >
+            {error && (
+              <div className="bg-red-50 text-red-500 p-3 rounded-lg text-sm text-center border border-red-100">
+                {error}
+              </div>
+            )}
+
             {/* Name Field (Register Only) */}
             <div
-              className={`transition-all duration-500 overflow-hidden ${
-                isLogin ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
-              }`}
+              className={`transition-all duration-500 overflow-hidden ${isLogin ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+                }`}
             >
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -153,9 +209,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
             {/* Confirm Password Field (Register Only) */}
             <div
-              className={`transition-all duration-500 overflow-hidden ${
-                isLogin ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
-              }`}
+              className={`transition-all duration-500 overflow-hidden ${isLogin ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+                }`}
             >
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
