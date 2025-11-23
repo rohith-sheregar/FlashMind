@@ -1,63 +1,35 @@
-import React, { useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import Landing from "./pages/Landing";
+import { useState } from "react";
+import { Routes, Route } from "react-router-dom";
+import AuthPage from "./components/AuthPage";
 import FlashcardGenerator from "./pages/FlashcardGenerator";
 import StudyMode from "./pages/StudyMode";
-import AuthPage from "./pages/AuthPage";
-import { useStore } from "./store/useStore";
-import api from "./services/api";
-
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const user = useStore((state) => state.user);
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-  return children;
-};
+import StudySelection from "./pages/StudySelection";
 
 function App() {
-  const setUser = useStore((state) => state.setUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem("token");
+  });
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const response = await api.get("/auth/me");
-          setUser(response.data);
-        } catch (error) {
-          console.error("Auth check failed:", error);
-          localStorage.removeItem("token");
-          setUser(null);
-        }
-      }
-    };
-    checkAuth();
-  }, [setUser]);
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <AuthPage onAuthSuccess={handleAuthSuccess} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans">
-      <Routes>
-        <Route path="/" element={<Navigate to="/auth" replace />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route
-          path="/flashcards"
-          element={
-            <ProtectedRoute>
-              <FlashcardGenerator onBack={() => { }} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/study"
-          element={
-            <ProtectedRoute>
-              <StudyMode />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/" element={<FlashcardGenerator onLogout={handleLogout} />} />
+      <Route path="/study" element={<StudySelection />} />
+      <Route path="/study/:deckId" element={<StudyMode />} />
+    </Routes>
   );
 }
 

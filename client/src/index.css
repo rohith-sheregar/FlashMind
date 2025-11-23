@@ -2,107 +2,139 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============================
-   ANIMATIONS
-   ============================ */
-
-@keyframes float {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  50% { transform: translate(0, -10px) rotate(1deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
-}
-
-@keyframes particle-float-new {
-  0% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(-20px) translateX(10px); }
-  100% { transform: translateY(0) translateX(0); }
-}
-
-.animate-float-new {
-  animation: particle-float-new 8s ease-in-out infinite;
-}
-
+/* Custom animations */
 @keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0px, 0px) scale(1); }
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
 }
 
-.animate-blob { animation: blob 10s infinite; }
-.animation-delay-2000 { animation-delay: 2s; }
-.animation-delay-4000 { animation-delay: 4s; }
-
-
-/* ============================
-   FLIP CARD & STACK CORE
-   ============================ */
-
-.flip-card {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  perspective: 1400px;
-  cursor: pointer;
+.animate-blob {
+  animation: blob 7s infinite;
 }
 
-.flip-inner {
-  width: 100%;
-  height: 100%;
-  position: relative;
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* 3D Transform utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring flip */
-  border-radius: 1.5rem;
 }
 
-.flip-inner.is-flipped {
-  transform: rotateY(180deg);
-}
-
-.flip-face {
-  position: absolute;
-  inset: 0;
-  border-radius: 1.5rem;
+.backface-hidden {
   backface-visibility: hidden;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.3); /* Deep shadow for realism */
 }
 
-.flip-back {
+.rotate-y-180 {
   transform: rotateY(180deg);
 }
 
-
-/* ============================
-   STACK LAYERS
-   ============================ */
-
-.card-stack {
-  position: relative;
-  transform-style: preserve-3d;
-  perspective: 1200px;
+/* Smooth transitions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
 }
 
-/* Each layer handles its own smooth transition */
-.card-layer {
-  position: absolute;
-  inset: 0;
-  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); /* Smooth ease-out */
-  transform-origin: center bottom;
-  border-radius: 1.5rem;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-/* The visual surface of the card (borders, glass, etc) */
-.card-surface {
-  width: 100%;
-  height: 100%;
-  border-radius: 1.5rem;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(10px);
-  position: relative;
-  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.shadow-3xl {
-  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.6);
+/* Hover effects */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Accessible progress bar */
+progress.progress-track {
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background-color: #e2e8f0;
+  overflow: hidden;
+  appearance: none;
+}
+
+progress.progress-track::-webkit-progress-bar {
+  background-color: #e2e8f0;
+  border-radius: 9999px;
+}
+
+progress.progress-track::-webkit-progress-value {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+progress.progress-track::-moz-progress-bar {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+/* Loading animation */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

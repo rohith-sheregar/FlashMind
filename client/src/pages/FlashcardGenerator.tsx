@@ -1,12 +1,17 @@
-import React, { useState, useCallback } from "react";
-import { ArrowLeft, Upload, X, Brain, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { Flashcard } from "../components/Flashcard";
+import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+import {
+  Upload,
+  Brain,
+  BookOpen,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  X,
+} from "lucide-react";
+import api, { API_URL, getDecks, getDeck } from "../services/api";
 import { IFlashcard } from "../types";
-import api, { API_URL } from "../services/api";
-
-interface FlashcardGeneratorProps {
-  onBack: () => void;
-}
+import { Flashcard } from "../components/Flashcard";
 
 interface UploadedFile {
   id: string;
@@ -18,12 +23,68 @@ interface UploadedFile {
   deckId?: string;
 }
 
-const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
+interface Deck {
+  id: number;
+  request_id: string;
+  title: string;
+  card_count: number;
+}
+
+interface FlashcardGeneratorProps {
+  onLogout: () => void;
+}
+
+const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onLogout }) => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [flashcards, setFlashcards] = useState<IFlashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [user, setUser] = useState<{ name?: string; email?: string }>({});
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  useEffect(() => {
+    fetchDecks();
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr && userStr !== "undefined") {
+        setUser(JSON.parse(userStr));
+      }
+    } catch (e) {
+      console.error("Failed to parse user data", e);
+    }
+  }, []);
+
+  const fetchDecks = async () => {
+    try {
+      const fetchedDecks = await getDecks();
+      setDecks(fetchedDecks);
+    } catch (error) {
+      console.error("Failed to fetch decks:", error);
+    }
+  };
+
+  const handleDeckSelect = async (deck: Deck) => {
+    try {
+      setSelectedDeckId(deck.request_id);
+      const deckData = await getDeck(deck.request_id);
+
+      const formattedCards: IFlashcard[] = deckData.cards.map((card: any, index: number) => ({
+        id: `${deck.id}-${index}`,
+        question: card.front,
+        answer: card.back,
+        fileId: deck.request_id
+      }));
+
+      setFlashcards(formattedCards);
+      setCurrentCardIndex(0);
+      setIsFlipped(false);
+    } catch (error) {
+      console.error("Failed to fetch deck details:", error);
+    }
+  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -61,7 +122,7 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
 
       try {
         // Update status to uploading
-        setUploadedFiles(prev => prev.map(f => 
+        setUploadedFiles(prev => prev.map(f =>
           f.id === fileId ? { ...f, status: 'uploading', progress: 30 } : f
         ));
 
@@ -73,12 +134,12 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
         });
 
         // Update status to processing
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === fileId ? { 
-            ...f, 
-            status: 'processing', 
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === fileId ? {
+            ...f,
+            status: 'processing',
             progress: 60,
-            deckId: response.data.deck_id 
+            deckId: response.data.deck_id
           } : f
         ));
 
@@ -104,15 +165,15 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
                   prev.map((f) =>
                     f.id === fileId
                       ? {
-                          ...f,
-                          status:
-                            status === "completed"
-                              ? "completed"
-                              : status === "error"
+                        ...f,
+                        status:
+                          status === "completed"
+                            ? "completed"
+                            : status === "error"
                               ? "error"
                               : "processing",
-                          progress: typeof progress === "number" ? progress : f.progress,
-                        }
+                        progress: typeof progress === "number" ? progress : f.progress,
+                      }
                       : f
                   )
                 );
@@ -145,6 +206,8 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
                   )
                 );
                 eventSource.close();
+                // Refresh decks list
+                fetchDecks();
               }
             } catch {
               // Ignore malformed events
@@ -163,14 +226,14 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
           };
         } catch (streamSetupError) {
           console.error("Failed to open flashcard stream:", streamSetupError);
-          setUploadedFiles(prev => prev.map(f => 
+          setUploadedFiles(prev => prev.map(f =>
             f.id === fileId ? { ...f, status: 'error', progress: 0 } : f
           ));
         }
 
       } catch (uploadError) {
         console.error("Upload failed:", uploadError);
-        setUploadedFiles(prev => prev.map(f => 
+        setUploadedFiles(prev => prev.map(f =>
           f.id === fileId ? { ...f, status: 'error', progress: 0 } : f
         ));
       }
@@ -218,33 +281,75 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 p-6">
+      <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 p-6 relative z-40">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center space-x-4">
-            <button
-              onClick={onBack}
-              type="button"
-              aria-label="Go back to landing"
-              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
-              <div className="flex items-center space-x-3">
-                {/* Logo placeholder area */}
-                <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Flashmind</h1>
-                  <p className="text-sm text-gray-500">Flashcard Generator</p>
-                </div>
+
+            <div className="flex items-center space-x-3">
+              {/* Logo placeholder area */}
+              <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Brain className="w-5 h-5 text-white" />
               </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Flashmind</h1>
+                <p className="text-sm text-gray-500">Flashcard Generator</p>
+              </div>
+            </div>
           </div>
-          <div className="text-sm text-gray-500">
-            {flashcards.length} flashcards generated
+          <div className="flex items-center gap-4">
+            <Link
+              to="/study"
+              className="flex items-center gap-2 px-4 py-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors font-medium"
+            >
+              <BookOpen size={20} />
+              Study Mode
+            </Link>
+
+            {/* User Profile Dropdown */}
+            <div className="relative z-50">
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none"
+              >
+                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold">
+                  {user.name?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <span className="font-medium hidden sm:block">
+                  {user.name && user.name.length > 5
+                    ? `${user.name.substring(0, 5)}...`
+                    : (user.name || "User")}
+                </span>
+              </button>
+
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[100] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-50">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user.name || "User"}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {user.email || ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="text-sm text-gray-500">
+              {flashcards.length} flashcards generated
+            </div>
           </div>
-        </div>
-      </header>
+        </div >
+      </header >
 
       <div className="max-w-7xl mx-auto p-6">
         <div className="grid lg:grid-cols-2 gap-8 h-[calc(100vh-140px)]">
@@ -252,17 +357,16 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
           <div className="space-y-6">
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-white/20">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Upload Documents</h2>
-              
+
               {/* Drop Zone */}
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
-                  isDragOver
-                    ? 'border-indigo-400 bg-indigo-50'
-                    : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
-                }`}
+                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${isDragOver
+                  ? 'border-indigo-400 bg-indigo-50'
+                  : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+                  }`}
               >
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-lg font-medium text-gray-700 mb-2">
@@ -288,10 +392,35 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* Uploaded Files */}
+            {/* Uploaded Files & Decks */}
+            {decks.length > 0 && (
+              <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-white/20">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Library</h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {decks.map((deck) => (
+                    <div
+                      key={deck.id}
+                      onClick={() => handleDeckSelect(deck)}
+                      className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-colors ${selectedDeckId === deck.request_id
+                        ? 'bg-indigo-100 border-indigo-200 border'
+                        : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                    >
+                      <div className="text-2xl">📚</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{deck.title}</p>
+                        <p className="text-xs text-gray-500">{deck.card_count} cards</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Currently Uploading Files */}
             {uploadedFiles.length > 0 && (
               <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-white/20">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Uploaded Files</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Uploading...</h3>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {uploadedFiles.map((file) => (
                     <div key={file.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
@@ -299,7 +428,7 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                         <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                        
+
                         {/* Progress Bar */}
                         {file.status !== 'completed' && file.status !== 'error' && (
                           <div className="mt-2">
@@ -311,7 +440,7 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
                           </div>
                         )}
                       </div>
-                      
+
                       {/* Status Icon */}
                       <div className="flex items-center space-x-2">
                         {file.status === 'uploading' && (
@@ -370,7 +499,7 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
                     onFlip={handleCardFlip}
                   />
                 </div>
-                
+
                 {/* Navigation */}
                 {flashcards.length > 1 && (
                   <div className="flex items-center justify-center space-x-4 mt-6">
@@ -393,7 +522,7 @@ const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

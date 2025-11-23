@@ -1,7 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, ForeignKey, Text
-from sqlalchemy.orm import relationship
 from app.services.db_setup import Base
 
 class Flashcard(Base):
@@ -9,7 +7,6 @@ class Flashcard(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     deck_id = Column(Integer, ForeignKey("decks.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
     question = Column(Text)
     answer = Column(Text)
     

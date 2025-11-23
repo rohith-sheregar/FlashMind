@@ -7,22 +7,19 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
+    // Auth is optional for now; endpoints are public by default.
   },
   timeout: 30000, // 30s timeout
 });
 
-// Add a request interceptor to attach the token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+export const getDecks = async () => {
+  const response = await api.get("/decks/");
+  return response.data;
+};
+
+export const getDeck = async (id: string) => {
+  const response = await api.get(`/decks/${id}`);
+  return response.data;
+};
 
 export default api;

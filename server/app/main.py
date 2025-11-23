@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import documents, decks, auth
-from app.services.db_setup import engine, Base, SessionLocal  # <--- Fixed Import
+from app.api import documents, decks, auth, quiz
+from app.services.db_setup import engine, Base, SessionLocal
 from app.models import user, deck, flashcard
-from app.models.user import User  # <--- Fixed Import for seeding
+from app.models.user import User
 
 # 1. Create Database Tables
 Base.metadata.create_all(bind=engine)
@@ -24,12 +24,10 @@ try:
         print("👤 Test User (ID: 1) already exists.")
     db.close()
 except Exception as e:
-    print(f"⚠️ Warning during user seeding: {e}")
+    print(f"Error seeding user: {e}")
 
-# 3. Initialize App
-app = FastAPI(title="FlashMind API")
+app = FastAPI()
 
-# 4. CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all for dev
@@ -42,6 +40,8 @@ app.add_middleware(
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(decks.router, prefix="/api/decks", tags=["Decks"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(quiz.router, prefix="/api/quiz", tags=["Quiz"])
+
 
 @app.get("/")
 def root():

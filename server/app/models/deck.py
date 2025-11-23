@@ -2,10 +2,6 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from app.services.db_setup import Base
 
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
-from app.services.db_setup import Base
-
 class Deck(Base):
     __tablename__ = "decks"
 

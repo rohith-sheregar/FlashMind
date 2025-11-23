@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.services.db_setup import Base
 
@@ -10,6 +10,8 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     password_hash = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationship to Decks (One User -> Many Decks)
+    # uses string "Deck" to avoid import errors
     decks = relationship("Deck", back_populates="owner")
