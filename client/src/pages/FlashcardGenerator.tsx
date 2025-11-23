@@ -30,7 +30,11 @@ interface Deck {
   card_count: number;
 }
 
-const FlashcardGenerator: React.FC = () => {
+interface FlashcardGeneratorProps {
+  onLogout: () => void;
+}
+
+const FlashcardGenerator: React.FC<FlashcardGeneratorProps> = ({ onLogout }) => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
@@ -38,9 +42,19 @@ const FlashcardGenerator: React.FC = () => {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [user, setUser] = useState<{ name?: string; email?: string }>({});
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     fetchDecks();
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr && userStr !== "undefined") {
+        setUser(JSON.parse(userStr));
+      }
+    } catch (e) {
+      console.error("Failed to parse user data", e);
+    }
   }, []);
 
   const fetchDecks = async () => {
@@ -263,10 +277,11 @@ const FlashcardGenerator: React.FC = () => {
     setIsFlipped(false);
     setCurrentCardIndex((prev) => (prev - 1 + flashcards.length) % flashcards.length);
   };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 p-6">
+      <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 p-6 relative z-40">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center space-x-4">
 
@@ -289,6 +304,46 @@ const FlashcardGenerator: React.FC = () => {
               <BookOpen size={20} />
               Study Mode
             </Link>
+
+            {/* User Profile Dropdown */}
+            <div className="relative z-50">
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none"
+              >
+                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold">
+                  {user.name?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <span className="font-medium hidden sm:block">
+                  {user.name && user.name.length > 5
+                    ? `${user.name.substring(0, 5)}...`
+                    : (user.name || "User")}
+                </span>
+              </button>
+
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[100] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-50">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user.name || "User"}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {user.email || ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="text-sm text-gray-500">
               {flashcards.length} flashcards generated
             </div>

@@ -36,14 +36,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     }
 
     try {
-      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
+      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/signup";
       const body = isLogin
         ? new URLSearchParams({
           username: formData.email,
           password: formData.password,
         })
         : JSON.stringify({
-          name: formData.name,
+          username: formData.name,
           email: formData.email,
           password: formData.password,
         });
@@ -73,6 +73,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
       if (isLogin) {
         localStorage.setItem("token", data.access_token);
+        localStorage.setItem("user", JSON.stringify(data.user));
         onAuthSuccess();
       } else {
         // Auto login after signup or switch to login mode
@@ -124,8 +125,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             <button
               onClick={() => setIsLogin(true)}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${isLogin
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                ? "bg-white text-indigo-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
                 }`}
             >
               Sign In
@@ -133,8 +134,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             <button
               onClick={() => setIsLogin(false)}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${!isLogin
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                ? "bg-white text-indigo-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
                 }`}
             >
               Sign Up

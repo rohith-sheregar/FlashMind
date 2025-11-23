@@ -6,10 +6,18 @@ import StudyMode from "./pages/StudyMode";
 import StudySelection from "./pages/StudySelection";
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem("token");
+  });
 
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setIsAuthenticated(false);
   };
 
   if (!isAuthenticated) {
@@ -18,7 +26,7 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<FlashcardGenerator />} />
+      <Route path="/" element={<FlashcardGenerator onLogout={handleLogout} />} />
       <Route path="/study" element={<StudySelection />} />
       <Route path="/study/:deckId" element={<StudyMode />} />
     </Routes>
