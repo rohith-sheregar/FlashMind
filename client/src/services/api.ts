@@ -9,7 +9,7 @@ const api = axios.create({
     "Content-Type": "application/json",
     // Auth is optional for now; endpoints are public by default.
   },
-  timeout: 30000, // 30s timeout
+  timeout: 120000, // 120s timeout for slower LLM generation
 });
 
 export const getDecks = async () => {

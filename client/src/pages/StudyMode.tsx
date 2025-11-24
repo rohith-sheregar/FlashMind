@@ -70,12 +70,15 @@ const StudyMode = () => {
       recentCards.push(deck!.cards[idx]);
     }
 
+    console.log("Generating quiz with cards:", recentCards);
+
     try {
       const response = await api.post("/quiz/generate", { cards: recentCards });
+      console.log("Quiz generation response:", response.data);
       setQuizData(response.data);
     } catch (error) {
       console.error("Failed to generate quiz:", error);
-      setShowQuiz(false); // Skip quiz on error
+      // setShowQuiz(false); // Keep popup open to show error
     } finally {
       setQuizLoading(false);
     }
@@ -160,7 +163,7 @@ const StudyMode = () => {
       {/* Quiz Overlay */}
       {showQuiz && (
         <div className="absolute inset-0 z-50 bg-slate-900/90 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-8 shadow-2xl">
             {quizLoading ? (
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
