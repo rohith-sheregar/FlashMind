@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCw, Volume2 } from "lucide-react";
 import api from "../services/api";
 
 // Define the shape of the data we expect from the API
@@ -57,36 +57,35 @@ const StudyMode = () => {
   const [quizResult, setQuizResult] = useState<"correct" | "incorrect" | null>(null);
 
   // --- QUIZ LOGIC ---
+  // --- QUIZ LOGIC ---
+  const handleGenerateQuiz = async () => {
+    setQuizLoading(true);
+    setShowQuiz(true);
+
+    // Get last 5 cards for context (or random ones if we wanted)
+    // For now, let's just take the current card + 4 previous ones to make context
+    const recentCards = [];
+    for (let i = 0; i < 5; i++) {
+      const idx = (currentCardIndex - i + deck!.cards.length) % deck!.cards.length;
+      recentCards.push(deck!.cards[idx]);
+    }
+
+    try {
+      const response = await api.post("/quiz/generate", { cards: recentCards });
+      setQuizData(response.data);
+    } catch (error) {
+      console.error("Failed to generate quiz:", error);
+      setShowQuiz(false); // Skip quiz on error
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
   const handleNextCard = async () => {
     const nextIndex = (currentCardIndex + 1) % deck!.cards.length;
-    const newReviewedCount = cardsReviewed + 1;
-    setCardsReviewed(newReviewedCount);
-
-    // Trigger quiz every 5 cards
-    if (newReviewedCount > 0 && newReviewedCount % 5 === 0) {
-      setQuizLoading(true);
-      setShowQuiz(true);
-
-      // Get last 5 cards for context
-      const recentCards = [];
-      for (let i = 0; i < 5; i++) {
-        const idx = (currentCardIndex - i + deck!.cards.length) % deck!.cards.length;
-        recentCards.push(deck!.cards[idx]);
-      }
-
-      try {
-        const response = await api.post("/quiz/generate", { cards: recentCards });
-        setQuizData(response.data);
-      } catch (error) {
-        console.error("Failed to generate quiz:", error);
-        setShowQuiz(false); // Skip quiz on error
-      } finally {
-        setQuizLoading(false);
-      }
-    } else {
-      setCurrentCardIndex(nextIndex);
-      setIsFlipped(false);
-    }
+    setCardsReviewed(cardsReviewed + 1);
+    setCurrentCardIndex(nextIndex);
+    setIsFlipped(false);
   };
 
   const handleQuizAnswer = (option: string) => {
@@ -144,6 +143,16 @@ const StudyMode = () => {
     setCurrentCardIndex(
       (prev) => (prev - 1 + deck.cards.length) % deck.cards.length
     );
+  };
+
+  const speakText = (text: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      speechSynthesis.speak(utterance);
+    }
   };
 
   return (
@@ -236,15 +245,24 @@ const StudyMode = () => {
         >
           <div
             className={`
-            relative w-full h-full duration-500 preserve-3d transition-all shadow-xl rounded-2xl bg-white
+            relative w-full h-full duration-500 transform-style-3d transition-all shadow-xl rounded-2xl bg-white
             ${isFlipped ? "rotate-y-180" : ""}
           `}
           >
             {/* FRONT */}
             <div className="absolute w-full h-full backface-hidden p-8 flex flex-col items-center justify-center text-center">
-              <span className="absolute top-4 left-4 text-xs font-bold tracking-wider text-slate-400 uppercase">
-                Question
-              </span>
+              <div className="absolute top-4 left-4 flex items-center gap-2">
+                <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
+                  Question
+                </span>
+                <button
+                  onClick={(e) => speakText(currentCard.front, e)}
+                  className="p-1 hover:bg-slate-100 rounded-full transition-colors"
+                  title="Listen"
+                >
+                  <Volume2 size={16} className="text-slate-400 hover:text-indigo-600" />
+                </button>
+              </div>
               <h2 className="text-2xl md:text-3xl font-medium text-slate-800 leading-relaxed">
                 {currentCard.front}
               </h2>
@@ -255,9 +273,18 @@ const StudyMode = () => {
 
             {/* BACK */}
             <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-indigo-600 text-white rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-              <span className="absolute top-4 left-4 text-xs font-bold tracking-wider text-indigo-200 uppercase">
-                Answer
-              </span>
+              <div className="absolute top-4 left-4 flex items-center gap-2">
+                <span className="text-xs font-bold tracking-wider text-indigo-200 uppercase">
+                  Answer
+                </span>
+                <button
+                  onClick={(e) => speakText(currentCard.back, e)}
+                  className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                  title="Listen"
+                >
+                  <Volume2 size={16} className="text-indigo-200 hover:text-white" />
+                </button>
+              </div>
               <p className="text-xl md:text-2xl leading-relaxed">
                 {currentCard.back}
               </p>
@@ -266,19 +293,39 @@ const StudyMode = () => {
         </div>
 
         {/* Controls */}
-        <div className="mt-8 flex items-center gap-6">
-          <button
-            onClick={prevCard}
-            className="p-3 rounded-full bg-white shadow hover:bg-slate-50 text-slate-700 transition"
-          >
-            <ChevronLeft size={24} />
-          </button>
+        <div className="mt-8 flex flex-col items-center gap-4">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={prevCard}
+              className="p-3 rounded-full bg-white shadow hover:bg-slate-50 text-slate-700 transition"
+            >
+              <ChevronLeft size={24} />
+            </button>
+
+            <button
+              onClick={handleNextCard}
+              className="p-3 rounded-full bg-white shadow hover:bg-slate-50 text-slate-700 transition"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
 
           <button
-            onClick={handleNextCard}
-            className="p-3 rounded-full bg-white shadow hover:bg-slate-50 text-slate-700 transition"
+            onClick={handleGenerateQuiz}
+            disabled={quizLoading}
+            className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-full font-medium hover:bg-indigo-200 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <ChevronRight size={24} />
+            {quizLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-indigo-700 border-t-transparent rounded-full animate-spin"></div>
+                Generating...
+              </>
+            ) : (
+              <>
+                <RotateCw size={16} />
+                Generate Quiz
+              </>
+            )}
           </button>
         </div>
       </div>
