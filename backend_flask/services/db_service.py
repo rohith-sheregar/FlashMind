@@ -49,9 +49,23 @@ def save_generated_mongo(record: dict):
     client = get_mongo_client()
     db = client.get_database(MONGO_DB_NAME)
     col = db.get_collection(MONGO_COLLECTION)
-    res = col.insert_one(record)
-    return str(res.inserted_id)
+    if '_id' in record:
+        col.replace_one({'_id': record['_id']}, record, upsert=True)
+        return str(record['_id'])
+    else:
+        res = col.insert_one(record)
+        return str(res.inserted_id)
 
+def check_duplicate(filename: str, username: str) -> bool:
+    if not _mongo_available:
+        return False
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection(MONGO_COLLECTION)
+        return col.find_one({'source_file': filename, 'created_by': username}) is not None
+    except Exception:
+        return False
 
 def list_generated_mongo(limit: int = 100):
     client = get_mongo_client()
@@ -59,14 +73,52 @@ def list_generated_mongo(limit: int = 100):
     col = db.get_collection(MONGO_COLLECTION)
     docs = list(col.find().sort('created_at', -1).limit(limit))
     # Convert ObjectId and datetime to str
-    for d in docs:
+    def _convert_mongo_doc(d: dict):
         d['_id'] = str(d.get('_id'))
         if 'created_at' in d:
             try:
                 d['created_at'] = d['created_at'].isoformat()
-            except Exception:
+            except:
                 d['created_at'] = str(d['created_at'])
-    return docs
+        return d
+    return [_convert_mongo_doc(d) for d in docs]
+
+def get_user_generation_count(username: str) -> int:
+    if not _mongo_available:
+        return 0
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection('user_limits')
+        user_doc = col.find_one({'username': username})
+        return user_doc.get('generations', 0) if user_doc else 0
+    except Exception as e:
+        logger.error(f"Error getting limit: {e}")
+        return 0
+
+def check_and_increment_generation(username: str, limit: int = 5) -> bool:
+    if not _mongo_available:
+        return True
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection('user_limits')
+        
+        user_doc = col.find_one({'username': username})
+        current_count = user_doc.get('generations', 0) if user_doc else 0
+        
+        if current_count >= limit:
+            return False
+            
+        col.update_one(
+            {'username': username},
+            {'$inc': {'generations': 1}},
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error checking limit: {e}")
+        return True
 
 
 def save_generated_file(record: dict):
@@ -103,6 +155,43 @@ def list_generated_file(limit: int = 100):
             except Exception:
                 continue
     return out
+
+
+def get_record_by_id(record_id: str):
+    if not _mongo_available:
+        return None
+    from bson.objectid import ObjectId
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection(MONGO_COLLECTION)
+        return col.find_one({'_id': ObjectId(record_id)})
+    except Exception as e:
+        logger.error(f"Error fetching record: {e}")
+        return None
+
+def check_and_increment_ai_limit(username: str) -> bool:
+    if not _mongo_available:
+        return True # Default allow if no Mongo
+    
+    today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+    client = get_mongo_client()
+    db = client.get_database(MONGO_DB_NAME)
+    users = db.get_collection('users')
+    
+    user = users.find_one({'username': username})
+    if not user:
+        return False
+        
+    usage = user.get('ai_usage', {})
+    count = usage.get(today, 0)
+    
+    if count >= 2:
+        return False
+        
+    usage[today] = count + 1
+    users.update_one({'username': username}, {'$set': {'ai_usage': usage}})
+    return True
 
 
 def save_generated(record: dict):

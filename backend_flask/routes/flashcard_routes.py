@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required
+
 # Support both package and script execution
 try:
     from backend_flask.services import db_service
@@ -11,6 +13,7 @@ flashcard_bp = Blueprint('flashcard_bp', __name__)
 
 
 @flashcard_bp.route('/list-generated', methods=['GET'])
+@jwt_required()
 def list_generated():
     try:
         # allow optional ?limit= param

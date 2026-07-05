@@ -3,390 +3,827 @@
 <head>
   <meta charset='utf-8'/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Flashcard Generator</title>
+  <title>FlashMind</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
   <style>
-    /* --- Original Theme Variables (Unchanged) --- */
     :root {
-      --primary: #4f46e5;
-      --primary-dark: #4338ca;
-      --gray-100: #f3f4f6;
-      --gray-200: #e5e7eb;
-      --gray-700: #374151;
-      --gray-900: #111827;
+      --bg-base: #09090b;
+      --bg-surface: rgba(24, 24, 27, 0.6);
+      --bg-surface-hover: rgba(39, 39, 42, 0.8);
+      --primary: #8b5cf6;
+      --primary-hover: #7c3aed;
+      --accent: #06b6d4;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --danger: #ef4444;
       --success: #10b981;
-      --radius: 12px;
-      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --radius: 16px;
+      --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      --glass-blur: blur(12px);
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+    body { 
+      background-color: var(--bg-base); 
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.15) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main); 
+      height: 100vh; 
+      overflow: hidden; 
     }
 
-    /* --- Reset and Body (Adapted for New Layout) --- */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
-      color: var(--gray-900);
-      min-height: 100vh;
-      line-height: 1.6;
-      /* We use Grid for the new 3-part layout */
-      display: grid;
-      grid-template-rows: 1fr auto; /* Content row (panels) and bottom bar row */
-      grid-template-columns: 1fr 1fr; /* Two equal columns for panels */
-      grid-template-areas:
-        "left right"
-        "bottom bottom";
-      padding: 1.5rem;
-      gap: 1.5rem;
-    }
-
-    /* --- New Panel Layout --- */
-    .panel {
-      background: white;
-      border-radius: var(--radius);
+    /* Glassmorphism Utilities */
+    .glass {
+      background: var(--bg-surface);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
       box-shadow: var(--shadow);
-      padding: 2rem;
-      /* Allow panels to scroll independently if content overflows */
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
     }
 
-    .panel-left {
-      grid-area: left;
+    /* Forms & Buttons */
+    .btn { 
+      background: linear-gradient(135deg, var(--primary), var(--accent)); 
+      color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; 
+      font-weight: 600; cursor: pointer; transition: 0.3s ease; 
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
     }
-
-    .panel-right {
-      grid-area: right;
-    }
-
-    .panel h2 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-      border-bottom: 2px solid var(--gray-200);
-      padding-bottom: 0.75rem;
-      color: var(--primary);
-    }
-
-    .empty-state {
-      color: var(--gray-700);
-      text-align: center;
-      padding: 3rem 1rem;
-      font-style: italic;
-    }
-
-    /* Left Panel (File List) */
-    #fileList {
-      flex-grow: 1;
-    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5); filter: brightness(1.1); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-danger { background: var(--danger); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: #dc2626; box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5); }
     
-    .file-item {
-      background: var(--gray-100);
-      padding: 0.75rem 1.25rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-      border: 1px solid var(--gray-200);
-      color: var(--gray-900);
+    .input-group { margin-bottom: 1.25rem; text-align: left; }
+    .input-group label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; }
+    .input-group input { 
+      width: 100%; padding: 0.85rem; border-radius: 12px; 
+      border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); 
+      color: var(--text-main); outline: none; transition: 0.3s;
     }
+    .input-group input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
 
-    /* Right Panel (Results) */
-    #result-container {
-      flex-grow: 1;
-      position: relative; /* For positioning the success message */
-    }
+    /* Auth Screen */
+    #authScreen { display: flex; align-items: center; justify-content: center; height: 100vh; }
+    .auth-box { padding: 3rem; border-radius: 24px; width: 100%; max-width: 420px; text-align: center; }
+    .auth-box h1 { font-size: 2.5rem; margin-bottom: 0.5rem; background: linear-gradient(to right, #c4b5fd, #67e8f9); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .auth-box p { color: var(--text-muted); margin-bottom: 2.5rem; font-size: 1.1rem; }
+    .auth-toggle { margin-top: 1.5rem; color: var(--text-muted); font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
+    .auth-toggle:hover { color: var(--text-main); }
+    #authError { color: #fca5a5; margin-bottom: 1rem; display: none; background: rgba(239, 68, 68, 0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3); }
 
-    .success-message {
-      color: var(--success);
-      font-weight: 600;
-      margin-bottom: 1rem;
-      display: none;
-    }
-    .success-message.show {
-      display: block;
-    }
+    /* Main App Layout */
+    #mainApp { display: none; height: 100vh; flex-direction: column; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--border-color); }
+    header h1 { font-size: 1.75rem; background: linear-gradient(to right, #c4b5fd, #67e8f9); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; }
+    .header-user { display: flex; align-items: center; gap: 1.5rem; }
+
+    .app-body { display: flex; flex: 1; overflow: hidden; }
     
-    #result {
-      /* (Original styles kept for JSON formatting) */
-      white-space: pre-wrap;
-      font-family: 'Courier New', monospace;
-      font-size: 0.9rem;
-      /* (Tweaked styles for new container) */
-      background: #f9fafb;
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      max-height: 60vh; /* Set a max height */
-      overflow-y: auto;
-      display: none; /* Hidden by default */
+    /* Left Sidebar (Decks) */
+    .sidebar { width: 340px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; background: rgba(24, 24, 27, 0.3); }
+    .upload-zone { padding: 2rem 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .upload-box { 
+      border: 2px dashed rgba(255,255,255,0.2); border-radius: 16px; padding: 2rem; 
+      text-align: center; cursor: pointer; transition: 0.3s ease;
+      background: rgba(0,0,0,0.2);
     }
-
-    /* --- New Bottom Upload Bar --- */
-    .upload-bar {
-      grid-area: bottom;
-      background: white;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 1.5rem 2rem;
-    }
-
-    #uploadForm {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1.5rem;
-      width: 100%;
-    }
-
-    /* (Original file drop, restyled for the bar) */
-    .file-drop {
-      border: 3px dashed var(--gray-200);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      background: var(--gray-100);
-      /* New flex styles */
-      flex-grow: 1; /* Takes up available space */
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-    }
-    .file-drop svg {
-      width: 48px;
-      height: 48px;
-      stroke: #9ca3af;
-      flex-shrink: 0; /* Don't shrink SVG */
-    }
-    .file-drop p {
-      color: var(--gray-700);
-      font-size: 1.1rem;
-      margin: 0;
-    }
-    .file-drop.dragover {
-      border-color: var(--primary);
-      background: #eef2ff;
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    .upload-controls {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-shrink: 0; /* Don't shrink controls */
-    }
-
-    /* (Original button styles, unchanged) */
-    .custom-file-upload,
-    button[type="submit"] {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
-      background: var(--primary);
-      color: white;
-      border-radius: 8px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s;
-      border: none;
-      font-size: 1rem;
-    }
-    .custom-file-upload:hover,
-    button[type="submit"]:hover {
-      background: var(--primary-dark);
-    }
-    button[type="submit"]:disabled {
-      background: #9ca3af;
-      cursor: not-allowed;
-    }
+    .upload-box:hover { border-color: var(--primary); background: rgba(139, 92, 246, 0.05); transform: translateY(-2px); }
+    .upload-box p { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.75rem; }
+    #fileInput { display: none; }
     
-    /* (Original loading spinner, position tweaked) */
-    .loading {
-      display: none;
-      color: var(--primary);
-      font-weight: 500;
+    .deck-list { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    .deck-item { 
+      padding: 1.25rem; border-radius: 12px; margin-bottom: 0.75rem; 
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); 
+      cursor: pointer; transition: 0.3s ease; position: relative; overflow: hidden;
     }
-    .loading.show {
-      display: block;
-    }
+    .deck-item::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); transform: scaleY(0); transition: 0.3s ease; }
+    .deck-item:hover { background: rgba(255,255,255,0.06); transform: translateX(4px); }
+    .deck-item.active { background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3); }
+    .deck-item.active::before { transform: scaleY(1); }
+    .deck-item .deck-title { font-weight: 500; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+    .deck-item .deck-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem; }
 
-    /* --- Responsive Design --- */
-    @media (max-width: 900px) {
-      body {
-        /* Stack everything vertically on smaller screens */
-        grid-template-rows: auto auto 1fr auto; /* Left, Right, Content, Bottom */
-        grid-template-columns: 1fr; /* Single column */
-        grid-template-areas:
-          "left"
-          "right"
-          "bottom";
-        padding: 1rem;
-        gap: 1rem;
-      }
-      .panel {
-        padding: 1.5rem;
-      }
-      #uploadForm {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .upload-controls {
-        justify-content: space-between;
-      }
+    /* Main Content Area */
+    .main-content { flex: 1; display: flex; flex-direction: column; position: relative; }
+    .tabs { display: flex; border-bottom: 1px solid var(--border-color); padding: 0 1rem; }
+    .tab-btn { 
+      padding: 1.25rem 1.5rem; background: none; border: none; color: var(--text-muted); 
+      font-weight: 500; font-size: 1rem; cursor: pointer; transition: 0.3s; 
+      border-bottom: 3px solid transparent; letter-spacing: 0.3px;
     }
+    .tab-btn:hover { color: var(--text-main); }
+    .tab-btn.active { color: var(--text-main); border-bottom-color: var(--primary); text-shadow: 0 0 12px rgba(139, 92, 246, 0.5); }
+    
+    .tab-pane { flex: 1; overflow-y: auto; padding: 2.5rem; display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.4s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .empty-state { height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-style: italic; font-size: 1.1rem; }
+
+    /* Flashcard UI */
+    .flashcard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2rem; }
+    .flashcard-wrapper { perspective: 1500px; height: 280px; }
+    .flashcard { width: 100%; height: 100%; position: relative; transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform-style: preserve-3d; cursor: pointer; }
+    .flashcard:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
+    .flashcard.is-flipped { transform: rotateY(180deg); }
+    .flashcard-face { 
+      position: absolute; width: 100%; height: 100%; backface-visibility: hidden; 
+      background: rgba(255,255,255,0.03); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); 
+      padding: 2rem; display: flex; flex-direction: column; justify-content: center; align-items: center; 
+      text-align: center; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+    .flashcard-face::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); }
+    .flashcard-back { transform: rotateY(180deg); background: rgba(139, 92, 246, 0.05); border-color: rgba(139, 92, 246, 0.3); }
+    .flashcard-face p { font-size: 1.1rem; line-height: 1.5; font-weight: 300; }
+    
+    .play-btn { 
+      position: absolute; top: 1.25rem; right: 1.25rem; background: rgba(0,0,0,0.3); 
+      border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 50%; 
+      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; 
+      cursor: pointer; z-index: 10; transition: 0.3s;
+    }
+    .play-btn:hover { background: var(--primary); border-color: var(--primary); transform: scale(1.1); box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); }
+
+    /* Markdown/AI Content Styles */
+    .ai-action-bar { margin-bottom: 2rem; text-align: center; }
+    .markdown-body { line-height: 1.7; color: var(--text-main); font-size: 1.1rem; font-weight: 300; background: rgba(255,255,255,0.02); padding: 2.5rem; border-radius: 20px; border: 1px solid var(--border-color); }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: #e2e8f0; margin-top: 1.5rem; margin-bottom: 1rem; font-weight: 500; }
+    .markdown-body ul, .markdown-body ol { margin-left: 1.5rem; margin-bottom: 1.5rem; }
+    .markdown-body li { margin-bottom: 0.75rem; }
+
+    /* Quiz UI */
+    .quiz-question { background: rgba(255,255,255,0.02); padding: 2rem; border-radius: 20px; margin-bottom: 2rem; border: 1px solid var(--border-color); }
+    .quiz-question h3 { margin-bottom: 1.5rem; font-size: 1.2rem; font-weight: 500; color: #e2e8f0; line-height: 1.5; }
+    .quiz-option { 
+      display: block; padding: 1rem 1.25rem; margin-bottom: 0.75rem; 
+      background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 12px; cursor: pointer; transition: 0.3s; font-weight: 400;
+    }
+    .quiz-option:hover { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); transform: translateX(5px); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.15); border-color: var(--success); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+    .quiz-option.incorrect { background: rgba(239, 68, 68, 0.15); border-color: var(--danger); }
+    .quiz-explanation { margin-top: 1.5rem; font-size: 0.95rem; color: #cbd5e1; display: none; padding: 1.25rem; background: rgba(255,255,255,0.05); border-radius: 12px; border-left: 4px solid var(--primary); }
+
+    .loading-spinner { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid var(--accent); width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    /* Running Student SVG Animation */
+    @keyframes pulseText { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes bounceBody { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    @keyframes runArmFront { 0%, 100% { transform: rotate(30deg); transform-origin: 50px 35px; } 50% { transform: rotate(-30deg); transform-origin: 50px 35px; } }
+    @keyframes runArmBack { 0%, 100% { transform: rotate(-30deg); transform-origin: 50px 35px; } 50% { transform: rotate(30deg); transform-origin: 50px 35px; } }
+    @keyframes runLegFront { 0%, 100% { transform: rotate(-40deg); transform-origin: 50px 55px; } 50% { transform: rotate(40deg); transform-origin: 50px 55px; } }
+    @keyframes runLegBack { 0%, 100% { transform: rotate(40deg); transform-origin: 50px 55px; } 50% { transform: rotate(-40deg); transform-origin: 50px 55px; } }
+
+    .running-student { animation: bounceBody 0.6s infinite ease-in-out; }
+    .running-student .arm-front { animation: runArmFront 0.6s infinite ease-in-out; }
+    .running-student .arm-back { animation: runArmBack 0.6s infinite ease-in-out; }
+    .running-student .leg-front { animation: runLegFront 0.6s infinite ease-in-out; }
+    .running-student .leg-back { animation: runLegBack 0.6s infinite ease-in-out; }
+    .running-student .backpack { animation: bounceBody 0.6s infinite ease-in-out alternate-reverse; }
 
   </style>
 </head>
 <body>
 
-  <aside class="panel panel-left">
-    <h2>Uploaded File</h2>
-    <div id="fileList">
-      <p class="empty-state" id="fileListEmpty">No file selected.</p>
-      </div>
-  </aside>
-
-  <main class="panel panel-right">
-    <h2>Generated Flashcards</h2>
-    <div id="result-container">
-      <div class="success-message" id="successMsg">Flashcards generated successfully!</div>
-      <pre id="result"></pre> <p class="empty-state" id="resultEmpty">Generated content will appear here.</p>
+  <!-- Auth Screen -->
+  <div id="authScreen">
+    <div class="auth-box">
+      <h1>FlashMind</h1>
+      <p>AI Study Companion</p>
+      <div id="authError"></div>
+      <form id="authForm">
+        <div class="input-group">
+          <label>Username</label>
+          <input type="text" id="username" required>
+        </div>
+        <div class="input-group">
+          <label>Password</label>
+          <input type="password" id="password" required>
+        </div>
+        <button type="submit" class="btn" style="width:100%" id="authSubmitBtn">Login</button>
+      </form>
+      <div class="auth-toggle" id="authToggleBtn">Don't have an account? Register here</div>
     </div>
-  </main>
+  </div>
 
-  <footer class="upload-bar">
-    <form id="uploadForm" enctype="multipart/form-data">
-      
-      <input type="file" name="file" id="fileInput" />
-      
-      <div class="file-drop" id="fileDrop">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke-width="1.5" style="margin: 0;">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="17 8 12 3 7 8"></polyline>
-          <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
-        <p>Drag & drop your notes here, or click to select</p>
+  <!-- Main App -->
+  <div id="mainApp">
+    <header>
+      <h1>🧠 FlashMind</h1>
+      <div class="header-user">
+        <span id="usageStats" style="font-weight: 600; color: var(--accent); margin-right: 1.5rem; display:none; background: rgba(6, 182, 212, 0.1); padding: 0.2rem 0.6rem; border-radius: 4px; border: 1px solid rgba(6, 182, 212, 0.3);">AI Uses: <span id="usageCount">0</span>/5</span>
+        <span id="welcomeText" style="font-weight: 500; color: var(--text-muted); margin-right: 1rem;"></span>
+        <button id="logoutBtn" class="btn btn-danger" style="padding: 0.5rem 1rem;">Logout</button>
       </div>
+    </header>
 
-      <div class="upload-controls">
-        <label for="fileInput" class="custom-file-upload">Choose File</label>
-        <button type="submit" id="submitBtn">Upload & Generate</button>
-        <div class="loading" id="loading">Generating...</div>
-      </div>
+    <div class="app-body">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="upload-zone" style="position: relative; overflow: hidden;">
+          <input type="file" id="fileInput">
+          <div class="upload-box" id="uploadBox">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto; color: var(--primary);">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <p style="margin-top:0.5rem; font-weight: 500; color:var(--text-main);">Upload Notes</p>
+            <p style="font-size: 0.8rem; margin-top: 0.25rem;">(PDF, DOCX, TXT)</p>
+            <div class="loading-spinner" id="uploadSpinner" style="margin-top:1rem;"></div>
+          </div>
+        </div>
+        <div class="deck-list" id="deckList">
+          <!-- Decks will be injected here -->
+        </div>
+      </aside>
 
-    </form>
-  </footer>
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="flashcards">Flashcards</button>
+          <button class="tab-btn" data-tab="topics">Key Topics</button>
+          <button class="tab-btn" data-tab="quiz">AI Quiz</button>
+          <button class="tab-btn" data-tab="mindmap">Mind Map</button>
+        </div>
+
+        <!-- Flashcards Tab -->
+        <div class="tab-pane active" id="tab-flashcards">
+          <div id="flashcardsEmpty" class="empty-state">Select a document from the left to view its flashcards.</div>
+          <div style="text-align:center;">
+             <button class="btn btn-danger" id="retryFlashcardsBtn" style="display:none; margin-bottom: 2rem;" onclick="retryFlashcards()">Regenerate Flashcards (Retry)</button>
+          </div>
+          <div class="flashcard-grid" id="flashcardsContainer"></div>
+        </div>
+
+        <!-- Topics Tab -->
+        <div class="tab-pane" id="tab-topics">
+          <div id="topicsEmpty" class="empty-state">Select a document, then generate topics.</div>
+          <div id="topicsContent" style="display:none;">
+            <div class="ai-action-bar">
+              <button class="btn" id="generateTopicsBtn">Generate Key Topics</button>
+              <div class="loading-spinner" id="topicsSpinner" style="display:inline-block; vertical-align:middle; margin-left:1rem;"></div>
+            </div>
+            <div class="markdown-body" id="topicsResult"></div>
+          </div>
+        </div>
+
+        <!-- Quiz Tab -->
+        <div class="tab-pane" id="tab-quiz">
+          <div id="quizEmpty" class="empty-state">Select a document, then generate a quiz.</div>
+          <div id="quizContent" style="display:none;">
+            <div class="ai-action-bar">
+              <button class="btn" id="generateQuizBtn">Generate Practice Quiz</button>
+              <div class="loading-spinner" id="quizSpinner" style="display:inline-block; vertical-align:middle; margin-left:1rem;"></div>
+            </div>
+            <div id="quizResult"></div>
+          </div>
+        </div>
+
+        <!-- Mind Map Tab -->
+        <div class="tab-pane" id="tab-mindmap">
+          <div id="mindmapEmpty" class="empty-state">Select a document, then generate a mind map.</div>
+          <div id="mindmapContent" style="display:none;">
+            <div class="ai-action-bar">
+              <button class="btn" id="generateMindmapBtn">Generate Mind Map</button>
+              <div class="loading-spinner" id="mindmapSpinner" style="display:inline-block; vertical-align:middle; margin-left:1rem;"></div>
+            </div>
+            <div id="mindmapResult" class="mermaid" style="text-align:center;"></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
 
   <script>
-    // --- Grabbing All Elements (Original + New) ---
-    const uploadForm = document.getElementById('uploadForm');
-    const fileInput = document.getElementById('fileInput');
-    const fileDrop = document.getElementById('fileDrop');
-    const submitBtn = document.getElementById('submitBtn');
-    const result = document.getElementById('result');
-    const loading = document.getElementById('loading');
-    const successMsg = document.getElementById('successMsg');
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
+    // State
+    let isLoginMode = true;
+    let currentRecordId = null;
+    let currentFlashcards = [];
+    let sessionUploadCount = 0;
+
+    // DOM Elements
+    const authScreen = document.getElementById('authScreen'), mainApp = document.getElementById('mainApp');
+    const authForm = document.getElementById('authForm'), authToggleBtn = document.getElementById('authToggleBtn');
+    const authSubmitBtn = document.getElementById('authSubmitBtn'), authError = document.getElementById('authError');
+    const welcomeText = document.getElementById('welcomeText'), logoutBtn = document.getElementById('logoutBtn');
+    const deckList = document.getElementById('deckList');
     
-    // New elements for the panel layout
-    const fileList = document.getElementById('fileList');
-    const fileListEmpty = document.getElementById('fileListEmpty');
-    const resultEmpty = document.getElementById('resultEmpty');
+    // Auth Logic
+    async function fetchUserStatus() {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/status', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('usageStats').style.display = 'inline-block';
+                document.getElementById('usageCount').textContent = data.generations_used;
+            }
+        } catch (e) {
+            console.error('Failed to fetch user status:', e);
+        }
+    }
 
-    // --- Drag & Drop (Unchanged from original) ---
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      fileDrop.addEventListener(eventName, preventDefaults, false);
-    });
+    function checkAuth() {
+      const token = localStorage.getItem('token');
+      const username = localStorage.getItem('username');
+      if (token && username) {
+        authScreen.style.display = 'none';
+        mainApp.style.display = 'flex';
+        welcomeText.textContent = `Welcome, ${username}`;
+        loadDecks();
+        fetchUserStatus();
+      } else {
+        authScreen.style.display = 'flex';
+        mainApp.style.display = 'none';
+      }
+    }
+    checkAuth();
 
-    function preventDefaults(e) {
+    authToggleBtn.onclick = () => {
+      isLoginMode = !isLoginMode;
+      authSubmitBtn.textContent = isLoginMode ? 'Login' : 'Register';
+      authToggleBtn.textContent = isLoginMode ? "Don't have an account? Register here" : "Already have an account? Login here";
+      authError.style.display = 'none';
+    };
+
+    authForm.onsubmit = async (e) => {
       e.preventDefault();
-      e.stopPropagation();
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      fileDrop.addEventListener(eventName, () => fileDrop.classList.add('dragover'), false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-      fileDrop.addEventListener(eventName, () => fileDrop.classList.remove('dragover'), false);
-    });
-
-    fileDrop.addEventListener('drop', handleDrop, false);
-    fileDrop.addEventListener('click', () => fileInput.click());
-
-    function handleDrop(e) {
-      const dt = e.dataTransfer;
-      const files = dt.files;
-      if (files.length > 0) {
-        fileInput.files = files;
-        updateFileName(files[0].name);
-      }
-    }
-
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files.length > 0) {
-        updateFileName(fileInput.files[0].name);
-      }
-    });
-
-    // --- updateFileName (Modified for Left Panel) ---
-    // This function now populates the left panel instead of just the dropzone text
-    function updateFileName(name) {
-      // 1. Update dropzone text (still useful)
-      fileDrop.querySelector('p').textContent = `Selected: ${name}`;
+      const endpoint = isLoginMode ? '/api/login' : '/api/register';
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
       
-      // 2. Hide the empty state message in the left panel
-      fileListEmpty.style.display = 'none';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          if (isLoginMode) {
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('username', data.username);
+            checkAuth();
+          } else {
+            alert('Registration successful. Please login.');
+            authToggleBtn.click();
+          }
+        } else {
+          authError.textContent = data.error || 'Authentication failed';
+          authError.style.display = 'block';
+        }
+      } catch (err) {
+        authError.textContent = 'Network error';
+        authError.style.display = 'block';
+      }
+    };
 
-      // 3. Create and inject the new file item
-      fileList.innerHTML = ''; // Clear any previous file
-      const fileItem = document.createElement('div');
-      fileItem.className = 'file-item';
-      fileItem.textContent = name;
-      fileList.appendChild(fileItem);
+    logoutBtn.onclick = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      checkAuth();
+    };
+
+    // Helper: Auth Fetch
+    async function fetchWithAuth(url, options = {}) {
+      const token = localStorage.getItem('token');
+      if (!options.headers) options.headers = {};
+      options.headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        alert("Session expired. Please login again.");
+        logoutBtn.click();
+        throw new Error("Unauthorized");
+      }
+      return res;
     }
 
-    // --- Form Submit (Slightly modified to handle new empty states) ---
-    uploadForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const file = fileInput.files[0];
-      if (!file) {
-        alert('Please choose a file');
-        return;
-      }
-
-      submitBtn.disabled = true;
-      loading.classList.add('show');
-      result.style.display = 'none'; // Hide old results
-      successMsg.classList.remove('show');
-      resultEmpty.style.display = 'none'; // Hide empty state on submit
-
-      const fd = new FormData();
-      fd.append('file', file);
-
+    // Load Decks (Documents)
+    async function loadDecks(autoSelectLatest = false) {
       try {
-        // --- THIS IS THE CORE BACKEND LOGIC (Unchanged) ---
-        const res = await fetch('/api/upload', { method: 'POST', body: fd });
-        const json = await res.json();
-        // --------------------------------------------------
+        const res = await fetchWithAuth('/api/list-generated');
+        const data = await res.json();
+        deckList.innerHTML = '';
+        if (data.length === 0) {
+          deckList.innerHTML = '<p class="empty-state" style="padding:0">No documents yet.</p>';
+          return;
+        }
+        let latestDiv = null;
+        let latestRecord = null;
+        data.forEach((record, idx) => {
+          const div = document.createElement('div');
+          div.className = 'deck-item';
+          div.innerHTML = `
+            <div class="deck-title">${record.source_file}</div>
+            <div class="deck-meta">${record.flashcards.length} cards • ${new Date(record.created_at).toLocaleDateString()}</div>
+          `;
+          div.onclick = () => selectDeck(record, div);
+          deckList.appendChild(div);
+          if (idx === 0) {
+             latestDiv = div;
+             latestRecord = record;
+          }
+        });
+        
+        if (autoSelectLatest && latestDiv) {
+           latestDiv.click();
+        }
+      } catch(e) { console.error(e); }
+    }
 
-        result.textContent = JSON.stringify(json, null, 2);
-        result.style.display = 'block';
-        successMsg.classList.add('show');
-        resultEmpty.style.display = 'none'; // Keep hidden on success
-      } catch (err) {
-        result.textContent = 'Error: ' + err.message;
-        result.style.display = 'block';
-        resultEmpty.style.display = 'none'; // Keep hidden on error
-      } finally {
-        submitBtn.disabled = false;
-        loading.classList.remove('show');
+    function selectDeck(record, element) {
+      document.querySelectorAll('.deck-item').forEach(el => el.classList.remove('active'));
+      element.classList.add('active');
+      currentRecordId = record._id;
+      currentFlashcards = record.flashcards;
+      
+      // Update UI state
+      document.getElementById('flashcardsEmpty').style.display = 'none';
+      document.getElementById('topicsEmpty').style.display = 'none';
+      document.getElementById('topicsContent').style.display = 'block';
+      document.getElementById('quizEmpty').style.display = 'none';
+      document.getElementById('quizContent').style.display = 'block';
+      document.getElementById('mindmapEmpty').style.display = 'none';
+      document.getElementById('mindmapContent').style.display = 'block';
+      
+      // Reset generate buttons
+      document.getElementById('generateTopicsBtn').style.display = 'inline-block';
+      document.getElementById('generateQuizBtn').style.display = 'inline-block';
+      document.getElementById('generateMindmapBtn').style.display = 'inline-block';
+
+      // Clear previous AI results
+      document.getElementById('topicsResult').innerHTML = '';
+      document.getElementById('quizResult').innerHTML = '';
+      document.getElementById('mindmapResult').innerHTML = '';
+      
+      if (record.topics) renderTopics(record.topics);
+      if (record.quiz) renderQuiz(record.quiz);
+      if (record.mindmap) renderMindmap(record.mindmap);
+
+      renderFlashcards();
+    }
+
+    // Render Flashcards with Voice
+    function renderFlashcards() {
+      const container = document.getElementById('flashcardsContainer');
+      const retryBtn = document.getElementById('retryFlashcardsBtn');
+      container.innerHTML = '';
+      
+      if (!currentFlashcards || currentFlashcards.length === 0) {
+        retryBtn.style.display = 'inline-block';
+        return;
+      } else {
+        retryBtn.style.display = 'none';
       }
+      
+      currentFlashcards.forEach((card, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flashcard-wrapper';
+        wrapper.innerHTML = `
+          <div class="flashcard" onclick="this.classList.toggle('is-flipped')">
+            <div class="flashcard-face">
+              <button class="play-btn" onclick="event.stopPropagation(); playVoice(this, ${index})">▶</button>
+              <h3 style="margin-bottom:0.5rem; color:var(--primary);">Q:</h3>
+              <p>${card.question}</p>
+            </div>
+            <div class="flashcard-face flashcard-back">
+              <h3 style="margin-bottom:0.5rem; color:var(--success);">A:</h3>
+              <p>${card.answer}</p>
+            </div>
+          </div>
+        `;
+        container.appendChild(wrapper);
+      });
+    }
+
+    function playVoice(btn, index) {
+      const cardData = currentFlashcards[index];
+      const cardElement = btn.closest('.flashcard');
+      
+      window.speechSynthesis.cancel();
+      
+      const uFront = new SpeechSynthesisUtterance(cardData.question);
+      const uBack = new SpeechSynthesisUtterance(cardData.answer);
+      
+      // Ensure card is showing front
+      cardElement.classList.remove('is-flipped');
+      
+      uFront.onend = () => {
+        // Flip card after reading front
+        cardElement.classList.add('is-flipped');
+        setTimeout(() => {
+          window.speechSynthesis.speak(uBack);
+        }, 500); // Wait for flip animation
+      };
+      
+      window.speechSynthesis.speak(uFront);
+    }
+
+    // Tabs Logic
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+      };
     });
+
+    // Regenerate Flashcards Logic
+    async function retryFlashcards() {
+      if (!currentRecordId) return;
+      const retryBtn = document.getElementById('retryFlashcardsBtn');
+      retryBtn.textContent = 'Regenerating...';
+      retryBtn.disabled = true;
+      startGenerationOverlay();
+      try {
+        const res = await fetchWithAuth(`/api/regenerate/${currentRecordId}`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+           currentFlashcards = data.flashcards;
+           renderFlashcards();
+           loadDecks(false); // refresh sidebar
+        } else {
+           alert(data.error || 'Failed to regenerate');
+        }
+      } catch (e) {
+        alert("Network error");
+      } finally {
+        stopGenerationOverlay();
+        retryBtn.textContent = 'Regenerate Flashcards (Retry)';
+        retryBtn.disabled = false;
+      }
+    }
+
+    // Upload Logic
+    const uploadBox = document.getElementById('uploadBox');
+    const fileInput = document.getElementById('fileInput');
+    uploadBox.onclick = () => fileInput.click();
+    fileInput.onchange = async () => {
+      if (!fileInput.files.length) return;
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      
+      document.getElementById('uploadSpinner').style.display = 'block';
+      startGenerationOverlay();
+      try {
+        const res = await fetchWithAuth('/api/upload', { method: 'POST', body: fd });
+        if (res.status === 429) throw new Error("Rate limit exceeded.");
+        if (!res.ok) {
+           const errData = await res.json().catch(() => ({}));
+           throw new Error(errData.error || "Upload failed");
+        }
+        
+        await loadDecks(true); // Automatically select the newly uploaded deck
+        fetchUserStatus(); // Update AI generation count
+        
+        // Auto-generate AI components for testing
+        document.getElementById('generateTopicsBtn').click();
+        document.getElementById('generateQuizBtn').click();
+        document.getElementById('generateMindmapBtn').click();
+        
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        document.getElementById('uploadSpinner').style.display = 'none';
+        stopGenerationOverlay();
+        fileInput.value = '';
+      }
+    };
+
+    // AI API Callers
+    async function callAI(endpoint, actionType, successCallback) {
+      if (!currentRecordId) return alert('Select a document first');
+      startGenerationOverlay(actionType);
+      
+      try {
+        const res = await fetchWithAuth(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ record_id: currentRecordId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to generate');
+        successCallback(data.data);
+        fetchUserStatus(); // Update AI generation count
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        stopGenerationOverlay();
+      }
+    }
+
+    // Render Functions
+    function renderTopics(markdown) {
+      document.getElementById('topicsResult').innerHTML = marked.parse(markdown);
+      document.getElementById('generateTopicsBtn').style.display = 'none';
+    }
+
+    function renderQuiz(quizData) {
+      let html = '';
+      quizData.forEach((q, i) => {
+        html += `
+          <div class="quiz-question" id="q-${i}">
+            <h3>${i + 1}. ${q.question}</h3>
+            ${q.options.map((opt, optIdx) => `<div class="quiz-option" onclick="checkAnswer(${i}, ${optIdx}, ${q.correct_index})">${opt}</div>`).join('')}
+            <div class="quiz-explanation" id="exp-${i}">${q.explanation}</div>
+          </div>`;
+      });
+      document.getElementById('quizResult').innerHTML = html;
+      document.getElementById('generateQuizBtn').style.display = 'none';
+    }
+
+    async function renderMindmap(mermaidText) {
+      const container = document.getElementById('mindmapResult');
+      container.innerHTML = `<div class="mermaid">${mermaidText}</div>`;
+      try {
+        await mermaid.run({ nodes: container.querySelectorAll('.mermaid') });
+        // Enable Pan/Zoom after rendering
+        const svgElement = container.querySelector('svg');
+        if (svgElement && window.svgPanZoom) {
+            svgElement.style.width = "100%";
+            svgElement.style.height = "500px";
+            svgPanZoom(svgElement, { controlIconsEnabled: true, zoomEnabled: true, panEnabled: true });
+        }
+        document.getElementById('generateMindmapBtn').style.display = 'none';
+      } catch (e) {
+        console.error("Mermaid parsing error:", e);
+        container.innerHTML = `<p style="color:var(--danger)">Failed to render mind map. Syntax error in generated code.</p><pre>${mermaidText}</pre>`;
+      }
+    }
+
+    // Topics
+    document.getElementById('generateTopicsBtn').onclick = () => {
+      callAI('/api/extract-topics', 'topics', (markdown) => renderTopics(markdown));
+    };
+
+    // Quiz
+    document.getElementById('generateQuizBtn').onclick = () => {
+      callAI('/api/generate-quiz', 'quiz', (quizData) => renderQuiz(quizData));
+    };
+
+    // Mindmap
+    document.getElementById('generateMindmapBtn').onclick = () => {
+      callAI('/api/generate-mindmap', 'mindmap', async (mermaidText) => await renderMindmap(mermaidText));
+    };
+
+    // Quiz
+    document.getElementById('generateQuizBtn').onclick = () => {
+      callAI('/api/generate-quiz', 'quizSpinner', (quizArray) => {
+        const container = document.getElementById('quizResult');
+        container.innerHTML = '';
+        quizArray.forEach((q, qIndex) => {
+          const qDiv = document.createElement('div');
+          qDiv.className = 'quiz-question';
+          qDiv.innerHTML = `<h3>${qIndex + 1}. ${q.question}</h3>`;
+          
+          const explanationDiv = document.createElement('div');
+          explanationDiv.className = 'quiz-explanation';
+          explanationDiv.innerHTML = `<strong>Explanation:</strong> ${q.explanation}`;
+          
+          q.options.forEach((opt, optIndex) => {
+            const optBtn = document.createElement('div');
+            optBtn.className = 'quiz-option';
+            optBtn.textContent = opt;
+            optBtn.onclick = () => {
+              // Lock answers
+              Array.from(qDiv.querySelectorAll('.quiz-option')).forEach(btn => btn.style.pointerEvents = 'none');
+              
+              if (optIndex === q.correct_index) {
+                optBtn.classList.add('correct');
+              } else {
+                optBtn.classList.add('incorrect');
+                // Highlight correct one
+                qDiv.querySelectorAll('.quiz-option')[q.correct_index].classList.add('correct');
+              }
+              explanationDiv.style.display = 'block';
+            };
+            qDiv.appendChild(optBtn);
+          });
+          
+          qDiv.appendChild(explanationDiv);
+          container.appendChild(qDiv);
+        });
+      });
+    };
+
+    // Generation Overlay Logic
+    let generationInterval;
+
+    function startGenerationOverlay(actionType) {
+        document.getElementById('generationOverlay').style.display = 'flex';
+        
+        let msgs = [
+            "Extracting text...", 
+            "Implementing RAG...", 
+            "Asking LLM...", 
+            "Synthesizing output...", 
+            "Finalizing..."
+        ];
+        
+        if (actionType === 'quiz') {
+            msgs = ["Analyzing text...", "Generating questions...", "Formulating distractors...", "Building quiz..."];
+        } else if (actionType === 'topics') {
+            msgs = ["Scanning document...", "Extracting keywords...", "Grouping concepts...", "Formatting topics..."];
+        } else if (actionType === 'mindmap') {
+            msgs = ["Parsing structure...", "Generating nodes...", "Connecting concepts...", "Drawing mind map..."];
+        } else if (actionType === 'flashcards') {
+            msgs = ["Extracting core ideas...", "Formulating Q&A...", "Validating facts...", "Finalizing flashcards..."];
+        }
+
+        let idx = 0;
+        document.getElementById('generationMessage').innerText = msgs[idx];
+        generationInterval = setInterval(() => {
+            idx = (idx + 1) % msgs.length;
+            document.getElementById('generationMessage').innerText = msgs[idx];
+        }, 2000);
+    }
+
+    function stopGenerationOverlay() {
+        document.getElementById('generationOverlay').style.display = 'none';
+        clearInterval(generationInterval);
+    }
   </script>
+
+  <style>
+    .loading-container {
+        position: relative;
+        width: 220px;
+        height: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .loading-ring {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        border: 4px solid transparent;
+        border-top-color: var(--primary);
+        border-right-color: var(--accent);
+        animation: spinRing 2s linear infinite;
+        box-shadow: 0 0 30px rgba(139, 92, 246, 0.4);
+    }
+    
+    .loading-ring::before {
+        content: '';
+        position: absolute;
+        top: 10px; left: 10px; right: 10px; bottom: 10px;
+        border-radius: 50%;
+        border: 4px solid transparent;
+        border-left-color: var(--accent);
+        border-bottom-color: var(--primary);
+        animation: spinRing 3s linear infinite reverse;
+    }
+
+    .detailed-student-avatar {
+        width: 160px; 
+        height: 160px;
+        background: url('/static/detailed_student.png') center center;
+        background-size: cover;
+        border-radius: 50%;
+        animation: floatAvatar 3s ease-in-out infinite;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        z-index: 2;
+    }
+
+    @keyframes spinRing {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes floatAvatar {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+  </style>
+
+  <div id="generationOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:9999; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(10px);">
+    
+    <div class="loading-container">
+        <div class="loading-ring"></div>
+        <lottie-player src="https://assets3.lottiefiles.com/packages/lf20_5njp3vgg.json" background="transparent" speed="1" style="width: 180px; height: 180px; z-index: 2;" loop autoplay></lottie-player>
+    </div>
+
+    <h2 id="generationMessage" style="color:var(--primary); font-weight:500; margin-top:2rem; font-size:1.5rem; letter-spacing:1px; animation: pulseText 1.5s infinite ease-in-out;">Extracting text...</h2>
+  </div>
 </body>
 </html>

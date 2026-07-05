@@ -8,10 +8,12 @@ try:
     from ml_service.config import PORT, MAX_QUESTIONS
     from ml_service.models.model_manager import ModelManager, ModelLoadError
     from ml_service.models.rule_based import enhanced_rule_based_generate
+    from ml_service.models.rag_processor import get_rag_processor
 except ModuleNotFoundError:
     from config import PORT, MAX_QUESTIONS
     from models.model_manager import ModelManager, ModelLoadError
     from models.rule_based import enhanced_rule_based_generate
+    from models.rag_processor import get_rag_processor
 
 app = FastAPI(title='Flashcard ML Service (Enhanced)')
 logger = logging.getLogger(__name__)
@@ -61,6 +63,26 @@ async def generate(req: GenRequest):
 
     except Exception as e:
         logger.error(f"Unexpected error in /generate: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail='Internal server error')
+
+
+class RAGRequest(BaseModel):
+    text: str
+    max_output_chars: int = 15000
+
+@app.post('/api/rag/condense')
+async def rag_condense(req: RAGRequest):
+    text = (req.text or '').strip()
+    if not text:
+        raise HTTPException(status_code=400, detail='No input text provided')
+        
+    try:
+        rag = get_rag_processor()
+        condensed = rag.condense_text(text, max_output_chars=req.max_output_chars)
+        return {'condensed_text': condensed}
+    except Exception as e:
+        logger.error(f"Error in /api/rag/condense: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail='Internal server error')
 
