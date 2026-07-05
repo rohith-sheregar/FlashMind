@@ -91,7 +91,14 @@ def get_user_generation_count(username: str) -> int:
         db = client.get_database(MONGO_DB_NAME)
         col = db.get_collection('user_limits')
         user_doc = col.find_one({'username': username})
-        return user_doc.get('generations', 0) if user_doc else 0
+        if not user_doc:
+            return 0
+            
+        today = datetime.date.today().isoformat()
+        if user_doc.get('last_reset_date') != today:
+            return 0
+            
+        return user_doc.get('generations', 0)
     except Exception as e:
         logger.error(f"Error getting limit: {e}")
         return 0
@@ -105,14 +112,23 @@ def check_and_increment_generation(username: str, limit: int = 5) -> bool:
         col = db.get_collection('user_limits')
         
         user_doc = col.find_one({'username': username})
-        current_count = user_doc.get('generations', 0) if user_doc else 0
+        today = datetime.date.today().isoformat()
+        
+        current_count = 0
+        if user_doc and user_doc.get('last_reset_date') == today:
+            current_count = user_doc.get('generations', 0)
         
         if current_count >= limit:
             return False
             
         col.update_one(
             {'username': username},
-            {'$inc': {'generations': 1}},
+            {
+                '$inc': {'generations': 1},
+                '$set': {'last_reset_date': today}
+            } if user_doc and user_doc.get('last_reset_date') == today else {
+                '$set': {'generations': 1, 'last_reset_date': today}
+            },
             upsert=True
         )
         return True
