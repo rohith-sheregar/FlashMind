@@ -5,66 +5,20 @@ import uvicorn, os, traceback, json, re, logging
 
 # Support running as a package (python -m ml_service.app) and as a script in the ml_service/ folder
 try:
-    from ml_service.config import PORT, MAX_QUESTIONS
-    from ml_service.models.model_manager import ModelManager, ModelLoadError
-    from ml_service.models.rule_based import enhanced_rule_based_generate
+    from ml_service.config import PORT
     from ml_service.models.rag_processor import get_rag_processor
 except ModuleNotFoundError:
-    from config import PORT, MAX_QUESTIONS
-    from models.model_manager import ModelManager, ModelLoadError
-    from models.rule_based import enhanced_rule_based_generate
+    from config import PORT
     from models.rag_processor import get_rag_processor
 
-app = FastAPI(title='Flashcard ML Service (Enhanced)')
+app = FastAPI(title='Flashcard ML Service (RAG Only)')
 logger = logging.getLogger(__name__)
-
-
-class GenRequest(BaseModel):
-    text: str
-    max_q: int = 15
-
-
-# Initialize model manager (may raise if critical libs missing)
-MODEL_MANAGER = None
-try:
-    MODEL_MANAGER = ModelManager()
-except ModelLoadError as e:
-    logger.warning(f"ModelManager initialization failed: {e}")
-    MODEL_MANAGER = None
 
 
 @app.get('/info')
 def info():
-    if MODEL_MANAGER:
-        return {'model': MODEL_MANAGER.get_model_info()}
-    return {'model': {'model_path': None, 'is_fallback': True, 'has_keybert': False}}
+    return {'status': 'active', 'rag_model': 'all-MiniLM-L6-v2'}
 
-
-@app.post('/generate')
-async def generate(req: GenRequest):
-    text = (req.text or '').strip()
-    max_q = min(req.max_q or 5, MAX_QUESTIONS)
-    if not text:
-        raise HTTPException(status_code=400, detail='No input text provided')
-
-    # Prefer ML model if available
-    try:
-        if MODEL_MANAGER:
-            try:
-                cards = MODEL_MANAGER.generate_flashcards(text, max_q=max_q)
-                if cards:
-                    return {'flashcards': cards}
-            except Exception as e:
-                logger.warning(f"Model generation error: {e}")
-                traceback.print_exc()
-
-        # Fallback to enhanced rule-based generator
-        return {'flashcards': enhanced_rule_based_generate(text, max_q=max_q)}
-
-    except Exception as e:
-        logger.error(f"Unexpected error in /generate: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail='Internal server error')
 
 
 class RAGRequest(BaseModel):
