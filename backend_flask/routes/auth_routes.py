@@ -86,8 +86,13 @@ def register():
 
     # --- Send OTP email ---
     if not send_otp_email(email, otp):
-        pending_collection.delete_many({'email': email})
-        return jsonify({'error': 'Failed to send verification email. Please check the email address and try again.'}), 500
+        # DEV FALLBACK: If email sending fails (e.g., SMTP blocked on Render Free Tier),
+        # log the OTP to the console so the developer can retrieve it from the Render dashboard.
+        logger.warning(f"--- [DEVELOPER FALLBACK] ---")
+        logger.warning(f"SMTP failed to send email to {email}. You can bypass this by copying the code below.")
+        logger.warning(f"YOUR VERIFICATION OTP: {otp}")
+        logger.warning(f"----------------------------")
+        return jsonify({'message': 'OTP generated. (Render Free Tier: check server console logs for the 6-digit code)'}), 200
 
     return jsonify({'message': 'OTP sent to your email. Please verify to complete registration.'}), 200
 
@@ -180,7 +185,13 @@ def resend_otp():
     )
 
     if not send_otp_email(email, new_otp):
-        return jsonify({'error': 'Failed to resend verification email.'}), 500
+        # DEV FALLBACK: If email sending fails (e.g., SMTP blocked on Render Free Tier),
+        # log the OTP to the console so the developer can retrieve it from the Render dashboard.
+        logger.warning(f"--- [DEVELOPER FALLBACK - RESEND] ---")
+        logger.warning(f"SMTP failed to resend email to {email}. You can bypass this by copying the code below.")
+        logger.warning(f"YOUR NEW VERIFICATION OTP: {new_otp}")
+        logger.warning(f"-------------------------------------")
+        return jsonify({'message': 'A new OTP has been generated. (Render Free Tier: check server console logs for the 6-digit code)'}), 200
 
     return jsonify({'message': 'A new OTP has been sent to your email.'}), 200
 
