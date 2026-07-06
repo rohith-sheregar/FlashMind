@@ -18,6 +18,15 @@ FlashMind is a premium, AI-powered study platform designed to transform your doc
 - **Frontend**: Vanilla HTML/CSS/JS (no heavy framework required)
 - **AI Models**: Local RAG via `ml_service` (HuggingFace transformers) and remote generation via OpenRouter.
 
+## AI & RAG Architecture
+
+FlashMind utilizes a highly optimized **Retrieval-Augmented Generation (RAG)** pipeline to process extremely large documents without exceeding LLM context windows or racking up massive API costs. Here's why our approach is the best:
+
+1. **Intelligent Chunking**: Large PDFs are broken down into semantically meaningful, overlapping text chunks (preserving sentence boundaries) to ensure no context is lost.
+2. **Local Embeddings**: We use HuggingFace's extremely fast `all-MiniLM-L6-v2` SentenceTransformer running completely locally on our separate `ml_service`. This guarantees zero latency for vector generation.
+3. **K-Means Clustering**: Instead of just sending the first 10 pages of a document to an LLM, FlashMind uses K-Means clustering on the generated embeddings. It selects the most diverse and highly representative chunks across the *entire* document, ensuring all core topics are covered in the flashcards.
+4. **Token Efficiency**: By condensing a 500-page book down to its most crucial, diverse embeddings, we pass only the highest quality data to OpenAI's GPT-4o model via OpenRouter, resulting in faster generation and incredibly deep, comprehensive study materials.
+
 ## Local Setup
 
 1. **Clone the repository**:
