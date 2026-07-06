@@ -38,6 +38,16 @@
       height: 100vh; 
       overflow: hidden; 
     }
+    
+    @media (max-width: 768px) {
+        .app-body { flex-direction: column; }
+        .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); max-height: 40vh; }
+        .main-content { overflow-y: auto; }
+        .tabs { flex-wrap: wrap; }
+        .tab-btn { padding: 1rem; flex: 1; text-align: center; }
+        header { padding: 1rem; }
+        .flashcard-grid { grid-template-columns: 1fr; }
+    }
 
     /* Glassmorphism Utilities */
     .glass {
@@ -307,10 +317,6 @@
         <div class="tab-pane" id="tab-topics">
           <div id="topicsEmpty" class="empty-state">Select a document, then generate topics.</div>
           <div id="topicsContent" style="display:none;">
-            <div class="ai-action-bar">
-              <button class="btn" id="generateTopicsBtn">Generate Key Topics</button>
-              <div class="loading-spinner" id="topicsSpinner" style="display:inline-block; vertical-align:middle; margin-left:1rem;"></div>
-            </div>
             <div class="markdown-body" id="topicsResult"></div>
           </div>
         </div>
@@ -319,10 +325,6 @@
         <div class="tab-pane" id="tab-quiz">
           <div id="quizEmpty" class="empty-state">Select a document, then generate a quiz.</div>
           <div id="quizContent" style="display:none;">
-            <div class="ai-action-bar">
-              <button class="btn" id="generateQuizBtn">Generate Practice Quiz</button>
-              <div class="loading-spinner" id="quizSpinner" style="display:inline-block; vertical-align:middle; margin-left:1rem;"></div>
-            </div>
             <div id="quizResult"></div>
           </div>
         </div>
@@ -331,11 +333,7 @@
         <div class="tab-pane" id="tab-mindmap">
           <div id="mindmapEmpty" class="empty-state">Select a document, then generate a mind map.</div>
           <div id="mindmapContent" style="display:none;">
-            <div class="ai-action-bar">
-              <button class="btn" id="generateMindmapBtn">Generate Mind Map</button>
-              <div class="loading-spinner" id="mindmapSpinner" style="display:inline-block; vertical-align:middle; margin-left:1rem;"></div>
-            </div>
-            <div id="mindmapResult" class="mermaid" style="text-align:center;"></div>
+            <div id="mindmapResult" style="width: 100%; height: 500px; background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden; margin-top: 1rem;"></div>
           </div>
         </div>
 
@@ -502,11 +500,6 @@
       // Show batch generation button
       document.getElementById('openBatchModalBtn').style.display = 'block';
 
-      // Reset generate buttons (hide them now, preferring batch modal)
-      document.getElementById('generateTopicsBtn').style.display = 'none';
-      document.getElementById('generateQuizBtn').style.display = 'none';
-      document.getElementById('generateMindmapBtn').style.display = 'none';
-
       // Clear previous AI results
       document.getElementById('topicsResult').innerHTML = '';
       document.getElementById('quizResult').innerHTML = '';
@@ -622,7 +615,6 @@
       const retryBtn = document.getElementById('retryFlashcardsBtn');
       retryBtn.textContent = 'Regenerating...';
       retryBtn.disabled = true;
-      startGenerationOverlay();
       try {
         const res = await fetchWithAuth(`/api/regenerate/${currentRecordId}`, { method: 'POST' });
         const data = await res.json();
@@ -636,7 +628,6 @@
       } catch (e) {
         alert("Network error");
       } finally {
-        stopGenerationOverlay();
         retryBtn.textContent = 'Regenerate Flashcards (Retry)';
         retryBtn.disabled = false;
       }
@@ -652,7 +643,6 @@
       fd.append('file', fileInput.files[0]);
       
       document.getElementById('uploadSpinner').style.display = 'block';
-      startGenerationOverlay();
       try {
         const res = await fetchWithAuth('/api/upload', { method: 'POST', body: fd });
         if (res.status === 429) throw new Error("Rate limit exceeded.");
@@ -664,16 +654,10 @@
         await loadDecks(true); // Automatically select the newly uploaded deck
         fetchUserStatus(); // Update AI generation count
         
-        // Auto-generate AI components for testing
-        document.getElementById('generateTopicsBtn').click();
-        document.getElementById('generateQuizBtn').click();
-        document.getElementById('generateMindmapBtn').click();
-        
       } catch (e) {
         alert(e.message);
       } finally {
         document.getElementById('uploadSpinner').style.display = 'none';
-        stopGenerationOverlay();
         fileInput.value = '';
       }
     };
@@ -805,8 +789,15 @@
 
     async function renderMindmap(mermaidText) {
       const container = document.getElementById('mindmapResult');
-      container.innerHTML = `<div class="mermaid">${mermaidText}</div>`;
       try {
+        let cleanText = mermaidText;
+        if (cleanText.includes("```mermaid")) {
+            cleanText = cleanText.split("```mermaid")[1].split("```")[0].trim();
+        } else if (cleanText.includes("```")) {
+            cleanText = cleanText.replace(/```/g, "").trim();
+        }
+        
+        container.innerHTML = `<div class="mermaid">${cleanText}</div>`;
         await mermaid.run({ nodes: container.querySelectorAll('.mermaid') });
         // Enable Pan/Zoom after rendering
         const svgElement = container.querySelector('svg');

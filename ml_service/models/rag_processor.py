@@ -15,7 +15,7 @@ class RAGProcessor:
             logger.error(f"Failed to load SentenceTransformer: {e}")
             self.model = None
 
-    def chunk_text(self, text: str, max_chars: int = 600, overlap: int = 100) -> List[str]:
+    def chunk_text(self, text: str, max_chars: int = 1500, overlap: int = 200) -> List[str]:
         """Split text into overlapping chunks for semantic processing."""
         # Clean text
         text = re.sub(r'\s+', ' ', text).strip()
@@ -34,7 +34,33 @@ class RAGProcessor:
             
             chunks.append(text[start:end].strip())
             start = end - overlap
-        return [c for c in chunks if len(c) > 50] # filter very short chunks
+            
+        # Filter boilerplate and very short chunks
+        boilerplate_keywords = [
+            'vision', 'mission', 'program outcome', 'course objective', 
+            'table of contents', 'index', 'preface', 'acknowledgement'
+        ]
+        
+        filtered_chunks = []
+        for c in chunks:
+            if len(c) < 50:
+                continue
+            
+            c_lower = c.lower()
+            
+            # If the chunk is very short and contains boilerplate keywords, skip it
+            if len(c) < 500:
+                if any(kw in c_lower for kw in boilerplate_keywords):
+                    continue
+                    
+            # If the chunk has an extremely high density of boilerplate keywords, skip it
+            kw_count = sum(1 for kw in boilerplate_keywords if kw in c_lower)
+            if kw_count >= 2:
+                continue
+                
+            filtered_chunks.append(c)
+            
+        return filtered_chunks
 
     def condense_text(self, text: str, max_output_chars: int = 15000) -> str:
         """

@@ -74,6 +74,7 @@ def generate_quiz(text: str) -> list:
     system_prompt = (
         "You are an expert educator. Based on the provided document text, "
         "generate a 5-question multiple-choice quiz testing the most important concepts. "
+        "IMPORTANT: STRICTLY IGNORE any administrative boilerplate such as Vision, Mission, Program Outcomes, Course Objectives, Table of Contents, or College information. Focus ONLY on the educational subject matter.\n"
         "Respond ONLY with a valid JSON array of objects, where each object has: "
         "'question' (str), 'options' (list of 4 str), 'correct_index' (int 0-3), and 'explanation' (str)."
     )
@@ -110,6 +111,7 @@ def generate_mindmap(text: str) -> str:
         "5. Keep node text extremely concise but highly descriptive (2-5 words max).\n"
         "6. Include relevant emojis in nodes to make it visually memorable.\n"
         "7. Do NOT include any markdown wrappers like ```mermaid in your output, just the raw code.\n"
+        "8. STRICTLY IGNORE administrative boilerplate (Vision, Mission, Program Outcomes, Index). Focus ONLY on subject matter.\n"
     )
     rag_text = _get_rag_context(text)
     
@@ -126,6 +128,7 @@ def extract_topics(text: str) -> str:
     system_prompt = (
         "You are an expert at summarizing documents. Based on the provided document text, "
         "extract the 5-7 most important concepts/topics. "
+        "IMPORTANT: STRICTLY IGNORE any administrative boilerplate such as Vision, Mission, Program Outcomes, Course Objectives, Table of Contents, or College information. Focus ONLY on the educational subject matter.\n"
         "Return the response formatted beautifully as a Markdown list with a brief 1-sentence description for each."
     )
     rag_text = _get_rag_context(text)
@@ -139,6 +142,7 @@ def generate_flashcards(text: str, max_q: int = 15) -> list:
         "CRITICAL INSTRUCTIONS: "
         "- Do NOT ask trivial or surface-level questions (e.g., 'What is the title of the document?', 'What is important to know about X?'). "
         "- Focus on 'Why' and 'How' questions that test deep comprehension. "
+        "- STRICTLY IGNORE any administrative boilerplate (Vision, Mission, Program Outcomes, Index, College names). Focus ONLY on educational material. "
         "- Format your response ONLY as a valid JSON array of objects, where each object has: "
         "'question' (string) and 'answer' (string)."
     )
