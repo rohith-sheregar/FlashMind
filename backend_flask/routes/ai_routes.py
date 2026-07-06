@@ -3,16 +3,24 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 try:
     from backend_flask.services import ai_service
-    from backend_flask.services.db_service import get_record_by_id, check_and_increment_ai_limit
+    from backend_flask.services.db_service import get_record_by_id, check_generation_limit
 except ModuleNotFoundError:
     from services import ai_service
-    from services.db_service import get_record_by_id, check_and_increment_ai_limit
+    from services.db_service import get_record_by_id, check_generation_limit
 
 ai_bp = Blueprint('ai_bp', __name__)
+
+import logging
+logger = logging.getLogger(__name__)
+file_handler = logging.FileHandler('backend_flask/ai_debug.log')
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
 
 def process_ai_request(action_func, field_name=None):
     """Helper to check limits, fetch document, and call the AI service."""
     current_user = get_jwt_identity()
+    logger.info(f"Starting process_ai_request for user {current_user}, field {field_name}")
     
     # Removed AI limit for testing
     # if not check_and_increment_ai_limit(current_user):
@@ -25,50 +33,59 @@ def process_ai_request(action_func, field_name=None):
 
     data = request.get_json()
     record_id = data.get('record_id')
+    logger.info(f"Request data received, record_id: {record_id}")
     if not record_id:
         return jsonify({'error': 'record_id is required'}), 400
 
     record = get_record_by_id(record_id)
+    logger.info(f"Record fetched: {bool(record)}")
     if not record:
         return jsonify({'error': 'Document not found'}), 404
         
     # Check if the field already exists (cached)
     if field_name and field_name in record and record[field_name]:
+        logger.info(f"Returning cached data for {field_name}")
         return jsonify({'data': record[field_name]}), 200
 
     current_user = get_jwt_identity()
     try:
-        from backend_flask.services.db_service import check_and_increment_generation, decrement_generation_count
+        from backend_flask.services.db_service import check_generation_limit, increment_generation_count
     except ModuleNotFoundError:
-        from services.db_service import check_and_increment_generation, decrement_generation_count
+        from services.db_service import check_generation_limit, increment_generation_count
         
-    if not check_and_increment_generation(current_user, limit=5):
+    logger.info("Checking generation limits...")
+    if not check_generation_limit(current_user, limit=5):
         return jsonify({'error': 'You have reached your limit of 5 AI generations. Please upgrade to premium!'}), 429
 
     filepath = record.get('path')
+    logger.info(f"File path: {filepath}")
     if not filepath:
-        decrement_generation_count(current_user)
         return jsonify({'error': 'Document file path missing'}), 404
 
+    logger.info("Extracting document text...")
     text = ai_service.get_document_text(filepath)
+    logger.info(f"Text extracted, length: {len(text) if text else 0}")
     if not text:
-        decrement_generation_count(current_user)
         return jsonify({'error': 'Could not extract text from document'}), 500
 
     try:
+        logger.info(f"Calling action_func for {field_name}...")
         result = action_func(text)
+        logger.info(f"action_func completed for {field_name}")
         
         # Save to database
         if field_name:
             record[field_name] = result
             save_generated(record)
+            logger.info("Result saved to database")
+            increment_generation_count(current_user)
             
         return jsonify({'data': result}), 200
     except ValueError as ve:
-        decrement_generation_count(current_user)
+        logger.error(f"ValueError in {field_name}: {ve}")
         return jsonify({'error': str(ve)}), 400
     except Exception as e:
-        decrement_generation_count(current_user)
+        logger.error(f"Exception in {field_name}: {e}")
         return jsonify({'error': 'AI Generation failed: ' + str(e)}), 500
 
 

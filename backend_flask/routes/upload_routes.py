@@ -165,18 +165,34 @@ def upload() -> Any:
     return jsonify({'status': 'ok', 'record_id': str(saved_id), 'flashcards': [], 'total_flashcards': 0}), 200
 
 
-@upload_bp.route('/upload/<record_id>', methods=['DELETE'])
+@upload_bp.route('/list', methods=['GET'])
 @jwt_required()
-def delete_document(record_id: str):
+def list_records() -> Any:
+    """GET /list
+    Returns a list of records for the current user.
+    """
     current_user = get_jwt_identity()
-    try:
-        from backend_flask.services.db_service import delete_record
-    except ModuleNotFoundError:
-        from services.db_service import delete_record
-        
-    success = delete_record(record_id, current_user)
+    records = db_service.list_generated(limit=50, username=current_user)
+    
+    # Strip heavy data for listing
+    for r in records:
+        r.pop('document_text', None)
+        if 'flashcards' in r and len(r['flashcards']) > 0:
+            r['flashcards'] = r['flashcards'][:1]
+    
+    return jsonify(records)
+
+
+@upload_bp.route('/documents/<record_id>', methods=['DELETE'])
+@jwt_required()
+def delete_document(record_id: str) -> Any:
+    """DELETE /documents/<record_id>
+    Deletes the document and its associated generated data.
+    """
+    current_user = get_jwt_identity()
+    success = db_service.delete_record(record_id, username=current_user)
     if success:
-        return jsonify({'status': 'ok', 'message': 'Document deleted successfully'}), 200
+        return jsonify({'message': 'Document deleted successfully'})
     else:
         return jsonify({'error': 'Failed to delete document or unauthorized'}), 400
 

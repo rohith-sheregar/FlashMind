@@ -132,7 +132,7 @@ def get_user_generation_count(username: str) -> int:
         logger.error(f"Error getting limit: {e}")
         return 0
 
-def check_and_increment_generation(username: str, limit: int = 5) -> bool:
+def check_generation_limit(username: str, limit: int = 5) -> bool:
     if not _mongo_available:
         return True
     try:
@@ -147,9 +147,22 @@ def check_and_increment_generation(username: str, limit: int = 5) -> bool:
         if user_doc and user_doc.get('last_reset_date') == today:
             current_count = user_doc.get('generations', 0)
         
-        if current_count >= limit:
-            return False
-            
+        return current_count < limit
+    except Exception as e:
+        logger.error(f"Error checking limit: {e}")
+        return True
+
+def increment_generation_count(username: str):
+    if not _mongo_available:
+        return
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection('user_limits')
+        
+        today = datetime.date.today().isoformat()
+        user_doc = col.find_one({'username': username})
+        
         col.update_one(
             {'username': username},
             {
@@ -160,26 +173,8 @@ def check_and_increment_generation(username: str, limit: int = 5) -> bool:
             },
             upsert=True
         )
-        return True
     except Exception as e:
-        logger.error(f"Error checking limit: {e}")
-        return True
-
-def decrement_generation_count(username: str):
-    if not _mongo_available:
-        return
-    try:
-        client = get_mongo_client()
-        db = client.get_database(MONGO_DB_NAME)
-        col = db.get_collection('user_limits')
-        
-        today = datetime.date.today().isoformat()
-        col.update_one(
-            {'username': username, 'last_reset_date': today, 'generations': {'$gt': 0}},
-            {'$inc': {'generations': -1}}
-        )
-    except Exception as e:
-        logger.error(f"Error decrementing limit: {e}")
+        logger.error(f"Error incrementing limit: {e}")
 
 
 def save_generated_file(record: dict):
