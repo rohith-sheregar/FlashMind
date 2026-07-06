@@ -99,11 +99,17 @@ def generate_mindmap(text: str) -> str:
         "create a highly detailed and memorable Mermaid.js mindmap summarizing the key concepts. "
         "CRITICAL INSTRUCTIONS:\n"
         "1. Start your response with exactly: `mindmap` on the first line.\n"
-        "2. The root node should clearly summarize the document's main subject and be centered. Use emojis for context (e.g., `root((📚 Subject Title))`)\n"
-        "3. Create at least 3-5 primary branches. Use distinct shapes for different hierarchical levels (e.g., `[Branch]`, `(Sub-branch)`, `((Detail))`).\n"
-        "4. Keep node text extremely concise but highly descriptive (2-5 words max).\n"
-        "5. Include relevant emojis or icons in many nodes to make it visually memorable and easier to study.\n"
-        "6. Do NOT include any markdown wrappers like ```mermaid in your output, just the raw code.\n"
+        "2. The root node must be on the next line, indented by 2 spaces (e.g., `  root((📚 Subject Title))`)\n"
+        "3. ALL subsequent branches MUST be created using ONLY indentation (spaces). DO NOT USE ARROWS (`-->` or `-.->`).\n"
+        "4. Example syntax:\n"
+        "mindmap\n"
+        "  root((Root Node))\n"
+        "    Branch 1\n"
+        "      Sub-branch 1\n"
+        "    Branch 2\n"
+        "5. Keep node text extremely concise but highly descriptive (2-5 words max).\n"
+        "6. Include relevant emojis in nodes to make it visually memorable.\n"
+        "7. Do NOT include any markdown wrappers like ```mermaid in your output, just the raw code.\n"
     )
     rag_text = _get_rag_context(text)
     

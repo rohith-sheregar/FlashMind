@@ -38,19 +38,21 @@ def process_ai_request(action_func, field_name=None):
 
     current_user = get_jwt_identity()
     try:
-        from backend_flask.services.db_service import check_and_increment_generation
+        from backend_flask.services.db_service import check_and_increment_generation, decrement_generation_count
     except ModuleNotFoundError:
-        from services.db_service import check_and_increment_generation
+        from services.db_service import check_and_increment_generation, decrement_generation_count
         
     if not check_and_increment_generation(current_user, limit=5):
         return jsonify({'error': 'You have reached your limit of 5 AI generations. Please upgrade to premium!'}), 429
 
     filepath = record.get('path')
     if not filepath:
+        decrement_generation_count(current_user)
         return jsonify({'error': 'Document file path missing'}), 404
 
     text = ai_service.get_document_text(filepath)
     if not text:
+        decrement_generation_count(current_user)
         return jsonify({'error': 'Could not extract text from document'}), 500
 
     try:
@@ -63,8 +65,10 @@ def process_ai_request(action_func, field_name=None):
             
         return jsonify({'data': result}), 200
     except ValueError as ve:
+        decrement_generation_count(current_user)
         return jsonify({'error': str(ve)}), 400
     except Exception as e:
+        decrement_generation_count(current_user)
         return jsonify({'error': 'AI Generation failed: ' + str(e)}), 500
 
 

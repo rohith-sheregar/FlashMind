@@ -115,12 +115,14 @@ def upload() -> Any:
     size = storage_file.stream.tell()
     storage_file.stream.seek(0)
     if FILE_SIZE_LIMIT and size > FILE_SIZE_LIMIT:
+        db_service.decrement_generation_count(created_by)
         return jsonify({'error': 'file too large'}), 413
 
     # Save file to disk
     try:
         filename, filepath = _save_uploaded_file(storage_file)
     except Exception as e:
+        db_service.decrement_generation_count(created_by)
         logger.exception("Failed to save uploaded file: %s", e)
         return jsonify({'error': 'failed to save file'}), 500
 
@@ -128,22 +130,28 @@ def upload() -> Any:
     try:
         chunks = file_service.extract_text_chunks(filepath, max_chunk_chars=2000, overlap_chars=200)
     except Exception as e:
+        db_service.decrement_generation_count(created_by)
         logger.exception("Chunk extraction failed: %s", e)
         return jsonify({'error': 'failed to extract text from file'}), 500
 
+    if not chunks:
+        db_service.decrement_generation_count(created_by)
+        return jsonify({'error': 'no text could be extracted from the document'}), 400
+
     total_chars = sum(len(c.get('text', '')) for c in chunks)
     if total_chars > MAX_TOTAL_CHARS:
+        db_service.decrement_generation_count(created_by)
         return jsonify({'error': 'document too large; reduce size or split'}), 413
 
-    # Generate Flashcards via OpenRouter AI (Highest Quality)
     full_text = "\n\n".join(c.get('text', '') for c in chunks)
     max_q_total = getattr(config_mod, 'MAX_Q_TOTAL', MAX_Q_TOTAL)
-    
+
     try:
         aggregated = ai_service.generate_flashcards(full_text, max_q=max_q_total)
     except Exception as e:
+        db_service.decrement_generation_count(created_by)
         logger.exception("AI Flashcard generation failed: %s", e)
-        aggregated = []
+        return jsonify({'error': 'AI Generation failed. ' + str(e)}), 500
         
     chunks_processed = len(chunks)
     model_version = 'openrouter_gpt-4o'

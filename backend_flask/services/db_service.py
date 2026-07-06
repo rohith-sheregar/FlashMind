@@ -136,6 +136,22 @@ def check_and_increment_generation(username: str, limit: int = 5) -> bool:
         logger.error(f"Error checking limit: {e}")
         return True
 
+def decrement_generation_count(username: str):
+    if not _mongo_available:
+        return
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection('user_limits')
+        
+        today = datetime.date.today().isoformat()
+        col.update_one(
+            {'username': username, 'last_reset_date': today, 'generations': {'$gt': 0}},
+            {'$inc': {'generations': -1}}
+        )
+    except Exception as e:
+        logger.error(f"Error decrementing limit: {e}")
+
 
 def save_generated_file(record: dict):
     if not ENABLE_FILE_DB:
