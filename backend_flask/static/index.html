@@ -250,6 +250,43 @@
 
       <!-- Main Content -->
       <main class="main-content">
+        <!-- Batch Selection Modal -->
+        <div id="batchSelectionModal" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.9); z-index:100; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
+            <div style="background:var(--bg-dark); padding:2.5rem; border-radius:16px; border:1px solid var(--border-color); width: 400px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h2 style="margin-bottom:1.5rem; color:var(--primary); text-align:center;">Generate Materials</h2>
+                <p style="color:var(--text-muted); margin-bottom:1.5rem; text-align:center; font-size:0.9rem;">Select what you want to generate for this document.</p>
+                
+                <label id="lblChkFlashcards" style="display:flex; align-items:center; margin-bottom:1rem; cursor:pointer;">
+                    <input type="checkbox" id="chkFlashcards" style="width:20px; height:20px; margin-right:1rem; accent-color:var(--primary);">
+                    <span style="font-size:1.1rem;">Flashcards</span>
+                </label>
+                
+                <label id="lblChkTopics" style="display:flex; align-items:center; margin-bottom:1rem; cursor:pointer;">
+                    <input type="checkbox" id="chkTopics" style="width:20px; height:20px; margin-right:1rem; accent-color:var(--primary);">
+                    <span style="font-size:1.1rem;">Key Topics</span>
+                </label>
+                
+                <label id="lblChkQuiz" style="display:flex; align-items:center; margin-bottom:1rem; cursor:pointer;">
+                    <input type="checkbox" id="chkQuiz" style="width:20px; height:20px; margin-right:1rem; accent-color:var(--primary);">
+                    <span style="font-size:1.1rem;">Practice Quiz</span>
+                </label>
+                
+                <label id="lblChkMindmap" style="display:flex; align-items:center; margin-bottom:2rem; cursor:pointer;">
+                    <input type="checkbox" id="chkMindmap" style="width:20px; height:20px; margin-right:1rem; accent-color:var(--primary);">
+                    <span style="font-size:1.1rem;">Mind Map</span>
+                </label>
+                
+                <div style="display:flex; gap:1rem;">
+                    <button class="btn" style="flex:1; background:transparent; border:1px solid var(--border-color); color:var(--text-main);" onclick="document.getElementById('batchSelectionModal').style.display='none'">Cancel</button>
+                    <button class="btn" style="flex:1;" onclick="executeBatchGeneration()">Generate Selected</button>
+                </div>
+            </div>
+        </div>
+        
+        <div style="position: absolute; top: 1rem; right: 1rem; z-index: 50;">
+            <button class="btn" id="openBatchModalBtn" style="display:none; padding: 0.5rem 1rem; font-size: 0.9rem;" onclick="openBatchModal()">+ Generate Materials</button>
+        </div>
+
         <div class="tabs">
           <button class="tab-btn active" data-tab="flashcards">Flashcards</button>
           <button class="tab-btn" data-tab="topics">Key Topics</button>
@@ -462,21 +499,55 @@
       document.getElementById('mindmapEmpty').style.display = 'none';
       document.getElementById('mindmapContent').style.display = 'block';
       
-      // Reset generate buttons
-      document.getElementById('generateTopicsBtn').style.display = 'inline-block';
-      document.getElementById('generateQuizBtn').style.display = 'inline-block';
-      document.getElementById('generateMindmapBtn').style.display = 'inline-block';
+      // Show batch generation button
+      document.getElementById('openBatchModalBtn').style.display = 'block';
+
+      // Reset generate buttons (hide them now, preferring batch modal)
+      document.getElementById('generateTopicsBtn').style.display = 'none';
+      document.getElementById('generateQuizBtn').style.display = 'none';
+      document.getElementById('generateMindmapBtn').style.display = 'none';
 
       // Clear previous AI results
       document.getElementById('topicsResult').innerHTML = '';
       document.getElementById('quizResult').innerHTML = '';
       document.getElementById('mindmapResult').innerHTML = '';
       
-      if (record.topics) renderTopics(record.topics);
-      if (record.quiz) renderQuiz(record.quiz);
-      if (record.mindmap) renderMindmap(record.mindmap);
+      let hasAnyContent = false;
+      if (record.topics) { renderTopics(record.topics); hasAnyContent = true; }
+      if (record.quiz && record.quiz.length > 0) { renderQuiz(record.quiz); hasAnyContent = true; }
+      if (record.mindmap) { renderMindmap(record.mindmap); hasAnyContent = true; }
+      if (record.flashcards && record.flashcards.length > 0) { hasAnyContent = true; }
 
       renderFlashcards();
+      
+      // Auto open modal if completely empty
+      if (!hasAnyContent) {
+          openBatchModal();
+      }
+    }
+    
+    function openBatchModal() {
+        if (!currentRecordId) return;
+        
+        // Hide options that are already generated
+        document.getElementById('lblChkFlashcards').style.display = (!currentFlashcards || currentFlashcards.length === 0) ? 'flex' : 'none';
+        
+        const topicsResult = document.getElementById('topicsResult').innerHTML;
+        document.getElementById('lblChkTopics').style.display = (!topicsResult) ? 'flex' : 'none';
+        
+        const quizResult = document.getElementById('quizResult').innerHTML;
+        document.getElementById('lblChkQuiz').style.display = (!quizResult) ? 'flex' : 'none';
+        
+        const mindmapResult = document.getElementById('mindmapResult').innerHTML;
+        document.getElementById('lblChkMindmap').style.display = (!mindmapResult) ? 'flex' : 'none';
+        
+        // Reset checkboxes
+        document.getElementById('chkFlashcards').checked = (!currentFlashcards || currentFlashcards.length === 0);
+        document.getElementById('chkTopics').checked = false;
+        document.getElementById('chkQuiz').checked = false;
+        document.getElementById('chkMindmap').checked = false;
+        
+        document.getElementById('batchSelectionModal').style.display = 'flex';
     }
 
     // Render Flashcards with Voice
@@ -608,7 +679,90 @@
     };
 
     // AI API Callers
-    async function callAI(endpoint, actionType, successCallback) {
+    // Batch Generation Async Helper
+    async function executeBatchGeneration() {
+        document.getElementById('batchSelectionModal').style.display = 'none';
+        
+        const doFlashcards = document.getElementById('chkFlashcards').checked && document.getElementById('lblChkFlashcards').style.display !== 'none';
+        const doTopics = document.getElementById('chkTopics').checked && document.getElementById('lblChkTopics').style.display !== 'none';
+        const doQuiz = document.getElementById('chkQuiz').checked && document.getElementById('lblChkQuiz').style.display !== 'none';
+        const doMindmap = document.getElementById('chkMindmap').checked && document.getElementById('lblChkMindmap').style.display !== 'none';
+        
+        if (!doFlashcards && !doTopics && !doQuiz && !doMindmap) return;
+        
+        // Use the unified loading overlay
+        startGenerationOverlay('batch');
+        
+        try {
+            if (doFlashcards) {
+                updateGenerationMessage("Generating Flashcards...");
+                const res = await fetchWithAuth('/api/generate-flashcards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_id: currentRecordId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    currentFlashcards = data.data;
+                    renderFlashcards();
+                } else {
+                    const err = await res.json();
+                    alert("Flashcards Error: " + (err.error || "Failed"));
+                }
+            }
+            
+            if (doTopics) {
+                updateGenerationMessage("Extracting Key Topics...");
+                const res = await fetchWithAuth('/api/extract-topics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_id: currentRecordId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderTopics(data.data);
+                }
+            }
+            
+            if (doQuiz) {
+                updateGenerationMessage("Formulating Practice Quiz...");
+                const res = await fetchWithAuth('/api/generate-quiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_id: currentRecordId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderQuiz(data.data);
+                }
+            }
+            
+            if (doMindmap) {
+                updateGenerationMessage("Designing Mind Map...");
+                const res = await fetchWithAuth('/api/generate-mindmap', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_id: currentRecordId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    await renderMindmap(data.data);
+                }
+            }
+        } catch (e) {
+            console.error("Batch generation failed", e);
+            alert("A network error occurred during batch generation.");
+        }
+        
+        stopGenerationOverlay();
+        fetchUserStatus(); // Update generation count
+        
+        // Refresh deck list to ensure local cache has full updated record
+        loadDecks(false);
+    }
+    
+    // Core AI Call function (still used by individual buttons if they were visible)
+    async function callAI(endpoint, actionType, onSuccess) {
       if (!currentRecordId) return alert('Select a document first');
       startGenerationOverlay(actionType);
       
@@ -620,7 +774,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to generate');
-        successCallback(data.data);
+        onSuccess(data.data);
         fetchUserStatus(); // Update AI generation count
       } catch (e) {
         alert(e.message);
@@ -683,48 +837,12 @@
       callAI('/api/generate-mindmap', 'mindmap', async (mermaidText) => await renderMindmap(mermaidText));
     };
 
-    // Quiz
-    document.getElementById('generateQuizBtn').onclick = () => {
-      callAI('/api/generate-quiz', 'quizSpinner', (quizArray) => {
-        const container = document.getElementById('quizResult');
-        container.innerHTML = '';
-        quizArray.forEach((q, qIndex) => {
-          const qDiv = document.createElement('div');
-          qDiv.className = 'quiz-question';
-          qDiv.innerHTML = `<h3>${qIndex + 1}. ${q.question}</h3>`;
-          
-          const explanationDiv = document.createElement('div');
-          explanationDiv.className = 'quiz-explanation';
-          explanationDiv.innerHTML = `<strong>Explanation:</strong> ${q.explanation}`;
-          
-          q.options.forEach((opt, optIndex) => {
-            const optBtn = document.createElement('div');
-            optBtn.className = 'quiz-option';
-            optBtn.textContent = opt;
-            optBtn.onclick = () => {
-              // Lock answers
-              Array.from(qDiv.querySelectorAll('.quiz-option')).forEach(btn => btn.style.pointerEvents = 'none');
-              
-              if (optIndex === q.correct_index) {
-                optBtn.classList.add('correct');
-              } else {
-                optBtn.classList.add('incorrect');
-                // Highlight correct one
-                qDiv.querySelectorAll('.quiz-option')[q.correct_index].classList.add('correct');
-              }
-              explanationDiv.style.display = 'block';
-            };
-            qDiv.appendChild(optBtn);
-          });
-          
-          qDiv.appendChild(explanationDiv);
-          container.appendChild(qDiv);
-        });
-      });
-    };
-
     // Generation Overlay Logic
     let generationInterval;
+
+    function updateGenerationMessage(msg) {
+        document.getElementById('generationMessage').textContent = msg;
+    }
 
     function startGenerationOverlay(actionType) {
         document.getElementById('generationOverlay').style.display = 'flex';
@@ -737,7 +855,9 @@
             "Finalizing..."
         ];
         
-        if (actionType === 'quiz') {
+        if (actionType === 'batch') {
+            msgs = ["Analyzing document...", "Orchestrating AI models...", "Synthesizing output..."];
+        } else if (actionType === 'quiz') {
             msgs = ["Analyzing text...", "Generating questions...", "Formulating distractors...", "Building quiz..."];
         } else if (actionType === 'topics') {
             msgs = ["Scanning document...", "Extracting keywords...", "Grouping concepts...", "Formatting topics..."];
@@ -748,11 +868,21 @@
         }
 
         let idx = 0;
-        document.getElementById('generationMessage').innerText = msgs[idx];
-        generationInterval = setInterval(() => {
-            idx = (idx + 1) % msgs.length;
-            document.getElementById('generationMessage').innerText = msgs[idx];
-        }, 2000);
+        updateGenerationMessage(msgs[0]);
+        
+        if (actionType !== 'batch') {
+            generationInterval = setInterval(() => {
+                idx = (idx + 1) % msgs.length;
+                updateGenerationMessage(msgs[idx]);
+            }, 3000);
+        } else {
+            // For batch, we update message manually, but cycle a default background message
+            generationInterval = setInterval(() => {
+                if(document.getElementById('generationMessage').textContent.includes("...")) return; // Don't overwrite manual updates
+                idx = (idx + 1) % msgs.length;
+                updateGenerationMessage(msgs[idx]);
+            }, 4000);
+        }
     }
 
     function stopGenerationOverlay() {

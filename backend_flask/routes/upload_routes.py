@@ -107,22 +107,19 @@ def upload() -> Any:
     if db_service.check_duplicate(storage_file.filename, created_by):
         return jsonify({'error': 'Duplicate document upload not allowed.'}), 400
 
-    if not db_service.check_and_increment_generation(created_by, limit=5):
-        return jsonify({'error': 'You have reached your limit of 5 document generations. Please upgrade to premium!'}), 429
+
 
     # File size limit
     storage_file.stream.seek(0, os.SEEK_END)
     size = storage_file.stream.tell()
     storage_file.stream.seek(0)
     if FILE_SIZE_LIMIT and size > FILE_SIZE_LIMIT:
-        db_service.decrement_generation_count(created_by)
         return jsonify({'error': 'file too large'}), 413
 
     # Save file to disk
     try:
         filename, filepath = _save_uploaded_file(storage_file)
     except Exception as e:
-        db_service.decrement_generation_count(created_by)
         logger.exception("Failed to save uploaded file: %s", e)
         return jsonify({'error': 'failed to save file'}), 500
 
@@ -130,40 +127,27 @@ def upload() -> Any:
     try:
         chunks = file_service.extract_text_chunks(filepath, max_chunk_chars=2000, overlap_chars=200)
     except Exception as e:
-        db_service.decrement_generation_count(created_by)
         logger.exception("Chunk extraction failed: %s", e)
         return jsonify({'error': 'failed to extract text from file'}), 500
 
     if not chunks:
-        db_service.decrement_generation_count(created_by)
         return jsonify({'error': 'no text could be extracted from the document'}), 400
 
     total_chars = sum(len(c.get('text', '')) for c in chunks)
     if total_chars > MAX_TOTAL_CHARS:
-        db_service.decrement_generation_count(created_by)
         return jsonify({'error': 'document too large; reduce size or split'}), 413
 
-    full_text = "\n\n".join(c.get('text', '') for c in chunks)
-    max_q_total = getattr(config_mod, 'MAX_Q_TOTAL', MAX_Q_TOTAL)
-
-    try:
-        aggregated = ai_service.generate_flashcards(full_text, max_q=max_q_total)
-    except Exception as e:
-        db_service.decrement_generation_count(created_by)
-        logger.exception("AI Flashcard generation failed: %s", e)
-        return jsonify({'error': 'AI Generation failed. ' + str(e)}), 500
-        
     chunks_processed = len(chunks)
     model_version = 'openrouter_gpt-4o'
     record: Dict[str, Any] = {
         'source_file': filename,
         'path': filepath,
         'num_chunks': chunks_processed,
-        'flashcards': aggregated,
+        'flashcards': [],
         'auto_approved': bool(auto_approve),
         'created_by': created_by,
         'model_version': str(model_version),
-        'stats': {'flashcards_generated': len(aggregated), 'chunks_processed': chunks_processed}
+        'stats': {'flashcards_generated': 0, 'chunks_processed': chunks_processed}
     }
 
     try:

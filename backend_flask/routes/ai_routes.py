@@ -88,3 +88,8 @@ def generate_mindmap_route():
 @jwt_required()
 def extract_topics_route():
     return process_ai_request(ai_service.extract_topics, 'topics')
+
+@ai_bp.route('/generate-flashcards', methods=['POST'])
+@jwt_required()
+def generate_flashcards_route():
+    return process_ai_request(ai_service.generate_flashcards, 'flashcards')
