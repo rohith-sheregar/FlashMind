@@ -10,11 +10,24 @@ except ModuleNotFoundError:
 
 ai_bp = Blueprint('ai_bp', __name__)
 
+import os
 import logging
 logger = logging.getLogger(__name__)
-file_handler = logging.FileHandler('backend_flask/ai_debug.log')
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
+
+log_path = 'ai_debug.log'
+if os.path.isdir('backend_flask'):
+    log_path = 'backend_flask/ai_debug.log'
+
+try:
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(file_handler)
+except Exception as e:
+    # Fallback to console logging if file writing is unavailable
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(console_handler)
+
 logger.setLevel(logging.INFO)
 
 def process_ai_request(action_func, field_name=None):
