@@ -38,6 +38,12 @@ RATE_LIMIT_STORAGE = os.getenv('RATE_LIMIT_STORAGE', 'memory://')
 
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 
+# Email / SMTP (for OTP verification)
+SMTP_EMAIL = os.environ.get('SMTP_EMAIL')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+
 # Misc
 DEFAULT_PAGE_SIZE = int(os.environ.get('DEFAULT_PAGE_SIZE', 50))
 # Whether to persist generated records to a local JSONL file when Mongo is

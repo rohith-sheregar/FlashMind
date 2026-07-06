@@ -112,6 +112,35 @@
     .auth-toggle:hover { color: var(--text-main); }
     #authError { color: #fca5a5; margin-bottom: 1rem; display: none; background: rgba(239, 68, 68, 0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3); }
 
+    /* OTP Input */
+    .otp-input {
+      text-align: center !important;
+      font-family: 'Courier New', monospace !important;
+      font-size: 1.8rem !important;
+      letter-spacing: 8px !important;
+      font-weight: 700 !important;
+    }
+    .otp-header { margin-bottom: 1.5rem; }
+
+    /* Email Validation Feedback */
+    .input-feedback {
+      font-size: 0.8rem;
+      margin-top: 0.4rem;
+      min-height: 1.2rem;
+      transition: color 0.2s;
+    }
+    .input-feedback.valid { color: var(--success); }
+    .input-feedback.invalid { color: var(--danger); }
+
+    /* Auth toggle button reset (when used as a <button>) */
+    button.auth-toggle {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+
     /* Main App Layout */
     #mainApp { display: none; height: 100vh; flex-direction: column; }
     header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--border-color); }

@@ -96,11 +96,14 @@ def delete_record(record_id: str, username: str) -> bool:
         logger.error(f"Error deleting record: {e}")
         return False
 
-def list_generated_mongo(limit: int = 100):
+def list_generated_mongo(limit: int = 100, username: str = None):
     client = get_mongo_client()
     db = client.get_database(MONGO_DB_NAME)
     col = db.get_collection(MONGO_COLLECTION)
-    docs = list(col.find().sort('created_at', -1).limit(limit))
+    query = {}
+    if username:
+        query['created_by'] = username
+    docs = list(col.find(query).sort('created_at', -1).limit(limit))
     # Convert ObjectId and datetime to str
     def _convert_mongo_doc(d: dict):
         d['_id'] = str(d.get('_id'))
@@ -191,7 +194,7 @@ def save_generated_file(record: dict):
     return str(DB_FILE)
 
 
-def list_generated_file(limit: int = 100):
+def list_generated_file(limit: int = 100, username: str = None):
     out = []
     if not ENABLE_FILE_DB:
         # File DB disabled, return empty set
@@ -205,6 +208,8 @@ def list_generated_file(limit: int = 100):
                 continue
             try:
                 obj = json.loads(ln)
+                if username and obj.get('created_by') != username:
+                    continue
                 out.append(obj)
                 if len(out) >= limit:
                     break
@@ -277,12 +282,12 @@ def save_generated(record: dict):
         return None
 
 
-def list_generated(limit: int = 100):
+def list_generated(limit: int = 100, username: str = None):
     if _mongo_available:
         try:
-            return list_generated_mongo(limit=limit)
+            return list_generated_mongo(limit=limit, username=username)
         except Exception as e:
             logger.warning('Failed to list from mongo, falling back to file: %s', e)
-            return list_generated_file(limit=limit)
+            return list_generated_file(limit=limit, username=username)
     else:
-        return list_generated_file(limit=limit)
+        return list_generated_file(limit=limit, username=username)

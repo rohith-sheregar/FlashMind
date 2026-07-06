@@ -39,7 +39,7 @@ def process_ai_request(action_func, field_name=None):
 
     record = get_record_by_id(record_id)
     logger.info(f"Record fetched: {bool(record)}")
-    if not record:
+    if not record or record.get('created_by') != current_user:
         return jsonify({'error': 'Document not found'}), 404
         
     # Check if the field already exists (cached)

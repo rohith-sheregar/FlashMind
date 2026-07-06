@@ -46,42 +46,247 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
     }
     checkAuth();
 
+    // DOM Elements - OTP
+    const otpForm = document.getElementById('otpForm');
+    const otpInput = document.getElementById('otpInput');
+    const otpEmailDisplay = document.getElementById('otpEmailDisplay');
+    const otpTimer = document.getElementById('otpTimer');
+    const resendOtpBtn = document.getElementById('resendOtpBtn');
+    const backToRegister = document.getElementById('backToRegister');
+    const emailGroup = document.getElementById('emailGroup');
+    const emailInput = document.getElementById('email');
+    const emailFeedback = document.getElementById('emailFeedback');
+
+    // Email regex for client-side validation
+    const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    // State for OTP flow
+    let pendingEmail = '';
+    let otpCountdown = null;
+
+    // Real-time email validation
+    emailInput.addEventListener('input', () => {
+        const val = emailInput.value.trim();
+        if (!val) {
+            emailFeedback.textContent = '';
+            emailFeedback.className = 'input-feedback';
+            return;
+        }
+        if (EMAIL_REGEX.test(val)) {
+            emailFeedback.textContent = '✓ Valid email';
+            emailFeedback.className = 'input-feedback valid';
+        } else {
+            emailFeedback.textContent = '✗ Invalid email format';
+            emailFeedback.className = 'input-feedback invalid';
+        }
+    });
+
+    // OTP input: only allow digits
+    otpInput.addEventListener('input', () => {
+        otpInput.value = otpInput.value.replace(/[^0-9]/g, '');
+    });
+
     authToggleBtn.onclick = () => {
       isLoginMode = !isLoginMode;
       authSubmitBtn.textContent = isLoginMode ? 'Login' : 'Register';
       authToggleBtn.textContent = isLoginMode ? "Don't have an account? Register here" : "Already have an account? Login here";
+      emailGroup.style.display = isLoginMode ? 'none' : 'block';
       authError.style.display = 'none';
+      emailFeedback.textContent = '';
     };
 
+    // Start OTP countdown timer
+    function startOtpTimer(seconds) {
+        clearInterval(otpCountdown);
+        let remaining = seconds;
+        resendOtpBtn.disabled = true;
+        resendOtpBtn.style.opacity = '0.5';
+
+        otpTimer.textContent = `Code expires in ${Math.floor(remaining / 60)}:${(remaining % 60).toString().padStart(2, '0')}`;
+        
+        otpCountdown = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(otpCountdown);
+                otpTimer.textContent = 'Code expired';
+                resendOtpBtn.disabled = false;
+                resendOtpBtn.style.opacity = '1';
+                return;
+            }
+            otpTimer.textContent = `Code expires in ${Math.floor(remaining / 60)}:${(remaining % 60).toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    // Show OTP verification phase
+    function showOtpPhase(email) {
+        pendingEmail = email;
+        authForm.style.display = 'none';
+        authToggleBtn.style.display = 'none';
+        otpForm.style.display = 'block';
+        otpEmailDisplay.textContent = email;
+        otpInput.value = '';
+        otpInput.focus();
+        authError.style.display = 'none';
+        startOtpTimer(300); // 5 minutes
+    }
+
+    // Show register phase (back from OTP)
+    function showRegisterPhase() {
+        clearInterval(otpCountdown);
+        authForm.style.display = 'block';
+        authToggleBtn.style.display = 'block';
+        otpForm.style.display = 'none';
+        authError.style.display = 'none';
+    }
+
+    backToRegister.onclick = showRegisterPhase;
+
+    // Main auth form submit (Login or Register Step 1)
     authForm.onsubmit = async (e) => {
       e.preventDefault();
-      const endpoint = isLoginMode ? '/api/login' : '/api/register';
-      const user = document.getElementById('username').value;
+      const user = document.getElementById('username').value.trim();
       const pass = document.getElementById('password').value;
-      
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user, password: pass })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          if (isLoginMode) {
+
+      if (isLoginMode) {
+        // --- LOGIN ---
+        try {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+          });
+          const data = await res.json();
+          if (res.ok) {
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('username', data.username);
             checkAuth();
           } else {
-            alert('Registration successful. Please login.');
-            authToggleBtn.click();
+            authError.textContent = data.error || 'Invalid credentials';
+            authError.style.display = 'block';
           }
+        } catch (err) {
+          authError.textContent = 'Network error';
+          authError.style.display = 'block';
+        }
+      } else {
+        // --- REGISTER (Step 1: Send OTP) ---
+        const email = emailInput.value.trim();
+
+        // Client-side validation
+        if (user.length < 3) {
+          authError.textContent = 'Username must be at least 3 characters';
+          authError.style.display = 'block';
+          return;
+        }
+        if (!EMAIL_REGEX.test(email)) {
+          authError.textContent = 'Please enter a valid email address';
+          authError.style.display = 'block';
+          return;
+        }
+        if (pass.length < 6) {
+          authError.textContent = 'Password must be at least 6 characters';
+          authError.style.display = 'block';
+          return;
+        }
+
+        authSubmitBtn.disabled = true;
+        authSubmitBtn.textContent = 'Sending OTP...';
+
+        try {
+          const res = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, email: email, password: pass })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            showOtpPhase(email);
+          } else {
+            authError.textContent = data.error || 'Registration failed';
+            authError.style.display = 'block';
+          }
+        } catch (err) {
+          authError.textContent = 'Network error';
+          authError.style.display = 'block';
+        } finally {
+          authSubmitBtn.disabled = false;
+          authSubmitBtn.textContent = 'Register';
+        }
+      }
+    };
+
+    // OTP form submit (Step 2: Verify OTP)
+    otpForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const otp = otpInput.value.trim();
+
+      if (otp.length !== 6) {
+        authError.textContent = 'Please enter the 6-digit code';
+        authError.style.display = 'block';
+        return;
+      }
+
+      const verifyBtn = document.getElementById('verifyOtpBtn');
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Verifying...';
+
+      try {
+        const res = await fetch('/api/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: pendingEmail, otp: otp })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          clearInterval(otpCountdown);
+          alert('🎉 ' + data.message + ' Please login now.');
+          showRegisterPhase();
+          // Switch to login mode
+          isLoginMode = true;
+          authSubmitBtn.textContent = 'Login';
+          authToggleBtn.textContent = "Don't have an account? Register here";
+          emailGroup.style.display = 'none';
         } else {
-          authError.textContent = data.error || 'Authentication failed';
+          authError.textContent = data.error || 'Verification failed';
           authError.style.display = 'block';
         }
       } catch (err) {
         authError.textContent = 'Network error';
         authError.style.display = 'block';
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verify & Create Account';
+      }
+    };
+
+    // Resend OTP
+    resendOtpBtn.onclick = async () => {
+      resendOtpBtn.disabled = true;
+      resendOtpBtn.textContent = 'Sending...';
+      authError.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/resend-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: pendingEmail })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          startOtpTimer(300);
+          authError.textContent = '';
+          authError.style.display = 'none';
+          otpInput.value = '';
+          otpInput.focus();
+        } else {
+          authError.textContent = data.error || 'Failed to resend';
+          authError.style.display = 'block';
+        }
+      } catch (err) {
+        authError.textContent = 'Network error';
+        authError.style.display = 'block';
+      } finally {
+        resendOtpBtn.textContent = 'Resend OTP';
       }
     };
 
@@ -214,7 +419,6 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
                     document.getElementById('quizContent').style.display = 'none';
                     document.getElementById('mindmapEmpty').style.display = 'block';
                     document.getElementById('mindmapContent').style.display = 'none';
-                    document.getElementById('openBatchModalBtn').style.display = 'none';
                     document.getElementById('flashcardsContainer').innerHTML = '';
                 }
                 loadDecks();
@@ -248,17 +452,46 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
       document.getElementById('quizResult').innerHTML = '';
       document.getElementById('mindmapResult').innerHTML = '';
       
-      // Hide buttons by default
-      document.getElementById('generateFlashcardsBtn').style.display = 'none';
-      document.getElementById('generateTopicsBtn').style.display = 'none';
-      document.getElementById('generateQuizBtn').style.display = 'none';
-      document.getElementById('generateMindmapBtn').style.display = 'none';
+      // Show all buttons, but change text depending on if content exists
+      const btnTopics = document.getElementById('generateTopicsBtn');
+      const btnQuiz = document.getElementById('generateQuizBtn');
+      const btnMindmap = document.getElementById('generateMindmapBtn');
+      const btnFlashcards = document.getElementById('generateFlashcardsBtn');
+      
+      btnTopics.style.display = 'block';
+      btnQuiz.style.display = 'block';
+      btnMindmap.style.display = 'block';
+      btnFlashcards.style.display = 'block';
       
       let hasAnyContent = false;
-      if (record.topics) { renderTopics(record.topics); hasAnyContent = true; } else { document.getElementById('generateTopicsBtn').style.display = 'block'; }
-      if (record.quiz && record.quiz.length > 0) { renderQuiz(record.quiz); hasAnyContent = true; } else { document.getElementById('generateQuizBtn').style.display = 'block'; }
-      if (record.mindmap) { renderMindmap(record.mindmap); hasAnyContent = true; } else { document.getElementById('generateMindmapBtn').style.display = 'block'; }
-      if (record.flashcards && record.flashcards.length > 0) { hasAnyContent = true; }
+      
+      if (record.topics) { 
+          renderTopics(record.topics); hasAnyContent = true; 
+          btnTopics.textContent = 'Regenerate Topics';
+      } else { 
+          btnTopics.textContent = 'Generate Topics';
+      }
+      
+      if (record.quiz && record.quiz.length > 0) { 
+          renderQuiz(record.quiz); hasAnyContent = true; 
+          btnQuiz.textContent = 'Regenerate Quiz';
+      } else { 
+          btnQuiz.textContent = 'Generate Quiz';
+      }
+      
+      if (record.mindmap) { 
+          renderMindmap(record.mindmap); hasAnyContent = true; 
+          btnMindmap.textContent = 'Regenerate Mind Map';
+      } else { 
+          btnMindmap.textContent = 'Generate Mind Map';
+      }
+      
+      if (record.flashcards && record.flashcards.length > 0) { 
+          hasAnyContent = true; 
+          btnFlashcards.textContent = 'Regenerate Flashcards';
+      } else {
+          btnFlashcards.textContent = 'Generate Flashcards';
+      }
 
       renderFlashcards();
       
@@ -444,7 +677,6 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
     // Render Functions
     function renderTopics(markdown) {
       document.getElementById('topicsResult').innerHTML = marked.parse(markdown);
-      document.getElementById('generateTopicsBtn').style.display = 'none';
     }
 
     function renderQuiz(quizData) {
@@ -458,7 +690,6 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
           </div>`;
       });
       document.getElementById('quizResult').innerHTML = html;
-      document.getElementById('generateQuizBtn').style.display = 'none';
     }
 
     async function renderMindmap(mermaidText) {
@@ -502,7 +733,6 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
             svgElement.style.height = "500px";
             svgPanZoom(svgElement, { controlIconsEnabled: true, zoomEnabled: true, panEnabled: true });
         }
-        document.getElementById('generateMindmapBtn').style.display = 'none';
       } catch (e) {
         console.error("Mermaid parsing error:", e);
         container.innerHTML = `<p style="color:var(--danger)">Failed to render mind map. Syntax error in generated code.</p><pre>${mermaidText}</pre>`;
