@@ -67,6 +67,35 @@ def check_duplicate(filename: str, username: str) -> bool:
     except Exception:
         return False
 
+def delete_record(record_id: str, username: str) -> bool:
+    if not _mongo_available:
+        return False
+    from bson.objectid import ObjectId
+    try:
+        client = get_mongo_client()
+        db = client.get_database(MONGO_DB_NAME)
+        col = db.get_collection(MONGO_COLLECTION)
+        
+        # Verify ownership
+        record = col.find_one({'_id': ObjectId(record_id)})
+        if not record or record.get('created_by') != username:
+            return False
+            
+        # Delete file if exists
+        filepath = record.get('path')
+        if filepath and os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                logger.warning(f"Could not delete file {filepath}: {e}")
+                
+        # Delete from DB
+        col.delete_one({'_id': ObjectId(record_id)})
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting record: {e}")
+        return False
+
 def list_generated_mongo(limit: int = 100):
     client = get_mongo_client()
     db = client.get_database(MONGO_DB_NAME)

@@ -151,7 +151,7 @@ def generate_flashcards(text: str, max_q: int = 15) -> list:
         raise ValueError("OPENROUTER_API_KEY is not configured.")
         
     try:
-        rag_text = _get_rag_context(text, max_output_chars=20000)
+        rag_text = _get_rag_context(text, max_output_chars=12000)
         
         response = client.chat.completions.create(
             model="openai/gpt-4o-mini",

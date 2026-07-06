@@ -162,8 +162,23 @@ def upload() -> Any:
         logger.exception("Failed to save generated record: %s", e)
         return jsonify({'error': 'failed to save generated flashcards'}), 500
 
-    sample = aggregated[:6]
-    return jsonify({'status': 'ok', 'record_id': str(saved_id), 'flashcards': sample, 'total_flashcards': len(aggregated)}), 200
+    return jsonify({'status': 'ok', 'record_id': str(saved_id), 'flashcards': [], 'total_flashcards': 0}), 200
+
+
+@upload_bp.route('/upload/<record_id>', methods=['DELETE'])
+@jwt_required()
+def delete_document(record_id: str):
+    current_user = get_jwt_identity()
+    try:
+        from backend_flask.services.db_service import delete_record
+    except ModuleNotFoundError:
+        from services.db_service import delete_record
+        
+    success = delete_record(record_id, current_user)
+    if success:
+        return jsonify({'status': 'ok', 'message': 'Document deleted successfully'}), 200
+    else:
+        return jsonify({'error': 'Failed to delete document or unauthorized'}), 400
 
 
 @upload_bp.route('/regenerate/<record_id>', methods=['POST'])
