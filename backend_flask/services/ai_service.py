@@ -45,7 +45,7 @@ def _get_rag_context(text: str, max_output_chars: int = 15000) -> str:
         # If the environment variable accidentally included /generate from the old setup, remove it.
         base_url = ML_SERVICE_URL.split('/generate')[0].rstrip('/')
         url = f"{base_url}/api/rag/condense"
-        resp = requests.post(url, json={"text": text, "max_output_chars": max_output_chars}, timeout=30)
+        resp = requests.post(url, json={"text": text, "max_output_chars": max_output_chars}, timeout=300)
         resp.raise_for_status()
         return resp.json().get('condensed_text', text[:max_output_chars])
     except Exception as e:
