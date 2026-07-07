@@ -68,32 +68,3 @@ FlashMind utilizes a highly optimized **Retrieval-Augmented Generation (RAG)** p
    ```
    Navigate to `http://127.0.0.1:5000` to access the platform.
 
-## Free Deployment Guide
-
-Host FlashMind for free using **Render** (web services) and **MongoDB Atlas** (database).
-
-### 1. MongoDB Atlas (Free Database)
-1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) and create a free account.
-2. Create a "Shared Cluster" (M0 Free Tier).
-3. Under **Database Access**, create a new user (save the username and password).
-4. Under **Network Access**, add `0.0.0.0/0` so your deployed backend can connect.
-5. Click **Connect** → **Drivers** → copy the connection string (`MONGO_URI`).
-
-### 2. Resend (Free Email API)
-1. Go to [Resend](https://resend.com) and create a free account.
-2. Go to **API Keys** and generate a new key.
-3. Copy the API key — you will add it as an environment variable on Render.
-
-### 3. Render (Free Web Service)
-1. Go to [Render](https://render.com/) and create a free account.
-2. Deploy the **Backend**: Click **New +** → **Web Service** → connect your GitHub repo.
-   - **Root Directory**: `backend_flask`
-   - **Environment**: `Docker`
-   - **Instance Type**: `Free`
-3. Add **Environment Variables**:
-   - `MONGO_URI`: Your MongoDB Atlas connection string
-   - `MONGO_DB_NAME`: `flashcard_db`
-   - `OPENROUTER_API_KEY`: Your OpenRouter API key
-   - `JWT_SECRET_KEY`: A secure random string
-   - `RESEND_API_KEY`: Your Resend API key
-4. Click **Deploy**. Once live, you'll receive a free `https://your-app.onrender.com` URL!
