@@ -2,7 +2,7 @@
 
 > **🚀 Live Demo: [https://flashmind-backend-tvd8.onrender.com/](https://flashmind-backend-tvd8.onrender.com/)**
 >
-> *(Free tier — first load may take ~30s to wake up)*
+> *(Free tier — first load may take ~30s to wake up. **Note: Check your Spam/Junk folder for the registration OTP verification email!**)*
 
 FlashMind is a premium, AI-powered study platform designed to transform your documents and notes into interactive learning experiences. Simply upload your PDF, DOCX, PPTX, or TXT files, and FlashMind will instantly generate flashcards, summarize key topics, build practice quizzes, and render beautiful visual mind maps.
 
@@ -13,7 +13,7 @@ FlashMind is a premium, AI-powered study platform designed to transform your doc
 - **Interactive Flashcards**: Includes Text-to-Speech (TTS) integration to read out questions and answers.
 - **Dynamic Quizzes**: Test your knowledge with auto-generated multiple-choice questions.
 - **Visual Mind Maps**: Render beautiful, interactive Mermaid.js diagrams directly in the browser with Zoom & Pan functionality.
-- **Email OTP Verification**: Secure user registration with 6-digit OTP sent via email.
+- **Email OTP Verification**: Secure user registration with 6-digit OTP sent via email (check your Spam/Junk folder!).
 - **Per-User Document Isolation**: Each user sees only their own uploaded documents.
 - **AI Usage Limits**: 5 AI generations per user per day with a visual counter.
 - **Premium UI/UX**: Built with a stunning dark theme, CSS glassmorphism, animations, and Lottie vector graphics.

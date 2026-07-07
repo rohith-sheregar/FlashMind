@@ -68,7 +68,7 @@ def process_ai_request(action_func, field_name=None):
         
     logger.info("Checking generation limits...")
     if not check_generation_limit(current_user, limit=5):
-        return jsonify({'error': 'You have reached your limit of 5 AI generations. Please upgrade to premium!'}), 429
+        return jsonify({'error': 'You have reached your daily limit quota. Come back tomorrow!'}), 429
 
     filepath = record.get('path')
     logger.info(f"File path: {filepath}")
