@@ -1,17 +1,23 @@
-"""Email service for sending OTP verification emails via SMTP."""
-import smtplib
+"""Email service for sending OTP verification emails.
+
+Supports two backends:
+  1. Resend (HTTP API) - works on Render free tier (recommended for production)
+  2. SMTP (Gmail)      - works on local development
+
+Set RESEND_API_KEY in your environment to use Resend.
+Falls back to SMTP if RESEND_API_KEY is not set.
+"""
 import random
 import string
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import json
 
 logger = logging.getLogger(__name__)
 
 try:
-    from backend_flask.config import SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT
+    from backend_flask.config import SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT, RESEND_API_KEY
 except ModuleNotFoundError:
-    from config import SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT
+    from config import SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT, RESEND_API_KEY
 
 
 def generate_otp(length=6):
@@ -19,18 +25,9 @@ def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
 
 
-def send_otp_email(to_email: str, otp: str) -> bool:
-    """Send an OTP verification email to the given address.
-    
-    Returns True on success, False on failure.
-    """
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
-        logger.error("SMTP credentials not configured. Set SMTP_EMAIL and SMTP_PASSWORD in .env")
-        return False
-
-    subject = "FlashMind - Verify Your Email"
-
-    html_body = f"""
+def _build_html(otp: str) -> str:
+    """Build the beautiful HTML email body."""
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -62,15 +59,57 @@ def send_otp_email(to_email: str, otp: str) -> bool:
     </html>
     """
 
+
+def _send_via_resend(to_email: str, otp: str) -> bool:
+    """Send OTP email using Resend HTTP API (not blocked by Render)."""
+    import requests
+
+    try:
+        response = requests.post(
+            'https://api.resend.com/emails',
+            headers={
+                'Authorization': f'Bearer {RESEND_API_KEY}',
+                'Content-Type': 'application/json',
+            },
+            json={
+                'from': 'FlashMind <onboarding@resend.dev>',
+                'to': [to_email],
+                'subject': 'FlashMind - Verify Your Email',
+                'html': _build_html(otp),
+            },
+            timeout=15,
+        )
+
+        if response.status_code == 200:
+            logger.info(f"OTP email sent via Resend to {to_email}")
+            return True
+        else:
+            logger.error(f"Resend API error ({response.status_code}): {response.text}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Resend API call failed: {e}")
+        return False
+
+
+def _send_via_smtp(to_email: str, otp: str) -> bool:
+    """Send OTP email using traditional SMTP (works locally, blocked on Render free tier)."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    if not SMTP_EMAIL or not SMTP_PASSWORD:
+        logger.error("SMTP credentials not configured. Set SMTP_EMAIL and SMTP_PASSWORD in .env")
+        return False
+
     msg = MIMEMultipart('alternative')
     msg['From'] = f"FlashMind <{SMTP_EMAIL}>"
     msg['To'] = to_email
-    msg['Subject'] = subject
+    msg['Subject'] = "FlashMind - Verify Your Email"
 
-    # Plain text fallback
     plain_text = f"Your FlashMind verification code is: {otp}\n\nThis code is valid for 5 minutes.\nIf you didn't request this, please ignore this email."
     msg.attach(MIMEText(plain_text, 'plain'))
-    msg.attach(MIMEText(html_body, 'html'))
+    msg.attach(MIMEText(_build_html(otp), 'html'))
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
@@ -79,7 +118,7 @@ def send_otp_email(to_email: str, otp: str) -> bool:
             server.ehlo()
             server.login(SMTP_EMAIL, SMTP_PASSWORD)
             server.send_message(msg)
-        logger.info(f"OTP email sent successfully to {to_email}")
+        logger.info(f"OTP email sent via SMTP to {to_email}")
         return True
     except smtplib.SMTPAuthenticationError:
         logger.error("SMTP authentication failed. Check SMTP_EMAIL and SMTP_PASSWORD.")
@@ -90,3 +129,17 @@ def send_otp_email(to_email: str, otp: str) -> bool:
     except Exception as e:
         logger.error(f"Unexpected error sending OTP to {to_email}: {e}")
         return False
+
+
+def send_otp_email(to_email: str, otp: str) -> bool:
+    """Send an OTP verification email.
+
+    Uses Resend API if RESEND_API_KEY is configured (recommended for production).
+    Falls back to SMTP otherwise (works for local development).
+    """
+    if RESEND_API_KEY:
+        logger.info("Using Resend API for email delivery")
+        return _send_via_resend(to_email, otp)
+    else:
+        logger.info("Using SMTP for email delivery (Resend API key not set)")
+        return _send_via_smtp(to_email, otp)

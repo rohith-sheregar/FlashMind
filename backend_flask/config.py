@@ -44,6 +44,9 @@ SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 
+# Resend API (HTTP-based email – works on Render free tier where SMTP ports are blocked)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+
 # Misc
 DEFAULT_PAGE_SIZE = int(os.environ.get('DEFAULT_PAGE_SIZE', 50))
 # Whether to persist generated records to a local JSONL file when Mongo is
