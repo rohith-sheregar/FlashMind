@@ -44,8 +44,7 @@ SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 
-# Resend API (HTTP-based email – works on Render free tier where SMTP ports are blocked)
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+
 
 # EmailJS (HTTP REST API – no domain needed, 200 free emails/month)
 EMAILJS_SERVICE_ID = os.environ.get('EMAILJS_SERVICE_ID')
