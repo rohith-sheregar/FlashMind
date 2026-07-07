@@ -1,11 +1,12 @@
 """Email service for sending OTP verification emails.
 
-Supports two backends:
-  1. Resend (HTTP API) - works on Render free tier (recommended for production)
-  2. SMTP (Gmail)      - works on local development
+Supports three backends (in priority order):
+  1. EmailJS (HTTP REST API) - works on Render free tier, no domain needed (recommended)
+  2. Resend  (HTTP API)      - requires a verified domain for non-self emails
+  3. SMTP   (Gmail)          - works locally, blocked on Render free tier
 
-Set RESEND_API_KEY in your environment to use Resend.
-Falls back to SMTP if RESEND_API_KEY is not set.
+Set EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY in your
+environment to use EmailJS.
 """
 import random
 import string
@@ -15,9 +16,17 @@ import json
 logger = logging.getLogger(__name__)
 
 try:
-    from backend_flask.config import SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT, RESEND_API_KEY
+    from backend_flask.config import (
+        SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT,
+        RESEND_API_KEY,
+        EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, EMAILJS_PRIVATE_KEY,
+    )
 except ModuleNotFoundError:
-    from config import SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT, RESEND_API_KEY
+    from config import (
+        SMTP_EMAIL, SMTP_PASSWORD, SMTP_HOST, SMTP_PORT,
+        RESEND_API_KEY,
+        EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, EMAILJS_PRIVATE_KEY,
+    )
 
 
 def generate_otp(length=6):
@@ -60,8 +69,51 @@ def _build_html(otp: str) -> str:
     """
 
 
+def _send_via_emailjs(to_email: str, otp: str) -> bool:
+    """Send OTP email using EmailJS REST API.
+
+    No domain verification needed. Free tier: 200 emails/month.
+    Uses your connected Gmail service to deliver real emails to any address.
+    """
+    import requests
+
+    payload = {
+        'service_id': EMAILJS_SERVICE_ID,
+        'template_id': EMAILJS_TEMPLATE_ID,
+        'user_id': EMAILJS_PUBLIC_KEY,
+        'template_params': {
+            'to_email': to_email,
+            'otp_code': otp,
+            'app_name': 'FlashMind',
+        },
+    }
+
+    # Add private key for server-side authentication if available
+    if EMAILJS_PRIVATE_KEY:
+        payload['accessToken'] = EMAILJS_PRIVATE_KEY
+
+    try:
+        response = requests.post(
+            'https://api.emailjs.com/api/v1.0/email/send',
+            data=json.dumps(payload),
+            headers={'Content-Type': 'application/json'},
+            timeout=15,
+        )
+
+        if response.status_code == 200:
+            logger.info(f"OTP email sent via EmailJS to {to_email}")
+            return True
+        else:
+            logger.error(f"EmailJS API error ({response.status_code}): {response.text}")
+            return False
+
+    except Exception as e:
+        logger.error(f"EmailJS API call failed: {e}")
+        return False
+
+
 def _send_via_resend(to_email: str, otp: str) -> bool:
-    """Send OTP email using Resend HTTP API (not blocked by Render)."""
+    """Send OTP email using Resend HTTP API."""
     import requests
 
     try:
@@ -134,12 +186,18 @@ def _send_via_smtp(to_email: str, otp: str) -> bool:
 def send_otp_email(to_email: str, otp: str) -> bool:
     """Send an OTP verification email.
 
-    Uses Resend API if RESEND_API_KEY is configured (recommended for production).
-    Falls back to SMTP otherwise (works for local development).
+    Priority:
+      1. EmailJS  (if EMAILJS_SERVICE_ID is set) — no domain needed, 200 free/month
+      2. Resend   (if RESEND_API_KEY is set)      — needs verified domain for non-self emails
+      3. SMTP     (fallback)                       — works locally, blocked on Render free tier
     """
+    if EMAILJS_SERVICE_ID and EMAILJS_TEMPLATE_ID and EMAILJS_PUBLIC_KEY:
+        logger.info("Using EmailJS for email delivery")
+        return _send_via_emailjs(to_email, otp)
+
     if RESEND_API_KEY:
         logger.info("Using Resend API for email delivery")
         return _send_via_resend(to_email, otp)
-    else:
-        logger.info("Using SMTP for email delivery (Resend API key not set)")
-        return _send_via_smtp(to_email, otp)
+
+    logger.info("Using SMTP for email delivery (no API keys set)")
+    return _send_via_smtp(to_email, otp)

@@ -47,6 +47,12 @@ SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 # Resend API (HTTP-based email – works on Render free tier where SMTP ports are blocked)
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 
+# EmailJS (HTTP REST API – no domain needed, 200 free emails/month)
+EMAILJS_SERVICE_ID = os.environ.get('EMAILJS_SERVICE_ID')
+EMAILJS_TEMPLATE_ID = os.environ.get('EMAILJS_TEMPLATE_ID')
+EMAILJS_PUBLIC_KEY = os.environ.get('EMAILJS_PUBLIC_KEY')
+EMAILJS_PRIVATE_KEY = os.environ.get('EMAILJS_PRIVATE_KEY')
+
 # Misc
 DEFAULT_PAGE_SIZE = int(os.environ.get('DEFAULT_PAGE_SIZE', 50))
 # Whether to persist generated records to a local JSONL file when Mongo is
