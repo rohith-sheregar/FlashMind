@@ -25,17 +25,46 @@ FlashMind is a premium, AI-powered study platform designed to transform your doc
 - **Frontend**: Vanilla HTML/CSS/JS with Mermaid.js, Marked.js, and Lottie Player
 - **AI Content Generation**: OpenRouter API (GPT-4o-mini)
 - **RAG Pipeline**: Local `ml_service` (FastAPI) with SentenceTransformers + Scikit-learn
-- **Email Delivery**: Resend HTTP API (production) / Gmail SMTP (local dev)
+- **Email Delivery**: EmailJS HTTP REST API (production) / Gmail SMTP (local dev fallback)
 - **Deployment**: Render (Web Services) + MongoDB Atlas (Database)
 
-## AI & RAG Architecture
+---
 
+## System Architecture & Security
+
+```
+                 [ Browser / Client ]
+                          │ (HTTPS)
+                          ▼
+                  [ Render Proxy ]
+                          │
+                          ▼
+            [ Flask Backend (Port 5000) ]
+             ├── Auth (JWT & Bcrypt)
+             ├── Rate Limiter (Fixed Window)
+             ├── Database Client (PyMongo)
+             └── Email Handler (EmailJS REST)
+               │                      │
+       (HTTP)  ▼                      ▼  (HTTPS)
+    [ ml_service ]             [ MongoDB Atlas ]
+   SentenceTransformers
+```
+
+### 1. Embedded Security & Rate Limiting
+To prevent abuse, credential stuffing, and resource exhaustion, FlashMind implements an embedded security layer at the application gateway level:
+* **Rate Limiting Algorithm (Fixed Window)**: Utilizing `Flask-Limiter` configured with a **Fixed Window** algorithm. Requests are tracked using the client's IP address (`get_remote_address`). If a client exceeds the threshold (default: `10 requests per hour`), the server immediately drops the request with an HTTP `429 Too Many Requests` response.
+* **Session Protection**: Stateful sessions are eliminated in favor of stateless JWT tokens (`Flask-JWT-Extended`). Authentication tokens are securely verified on each request, guaranteeing complete backend isolation of user documents and decks.
+* **Password Hashing**: Passwords are secure-hashed using `Flask-Bcrypt` (implementing the Blowfish cipher key-derivation function) before entering the database.
+
+### 2. AI & RAG Architecture
 FlashMind utilizes a highly optimized **Retrieval-Augmented Generation (RAG)** pipeline to process extremely large documents without exceeding LLM context windows or racking up massive API costs:
 
-1. **Intelligent Chunking**: Large PDFs are broken down into semantically meaningful, overlapping text chunks (preserving sentence boundaries) with automatic boilerplate filtering (removes Vision/Mission statements, Table of Contents, etc.).
-2. **Local Embeddings**: We use HuggingFace's extremely fast `all-MiniLM-L6-v2` SentenceTransformer running on a separate `ml_service`. This guarantees zero latency for vector generation.
-3. **K-Means Clustering**: Instead of just sending the first few pages to an LLM, FlashMind uses K-Means clustering on the generated embeddings. It selects the most diverse and highly representative chunks across the *entire* document, ensuring all core topics are covered.
-4. **Token Efficiency**: By condensing a large document down to its most crucial, diverse embeddings, we pass only the highest quality data to GPT-4o-mini via OpenRouter, resulting in faster generation and incredibly deep, comprehensive study materials.
+1. **Intelligent Chunking**: Large PDFs are broken down into semantically meaningful, overlapping text chunks of `1500` characters, cutting only at sentence endings within a `100` character window. Automatic academic noise and boilerplate (e.g. Table of Contents, copyright notices) are filtered out.
+2. **Local Vector Embeddings**: We use HuggingFace's extremely fast `all-MiniLM-L6-v2` SentenceTransformer running on a separate `ml_service` container. This maps each chunk into a 384-dimensional vector space.
+3. **K-Means Clustering**: Instead of just sending the first few pages of a document to the LLM, FlashMind runs K-Means clustering on the generated vectors. It selects the most diverse and highly representative chunks across the *entire* document, ensuring all core topics are covered.
+4. **Token Efficiency**: By condensing a 500-page book down to its most crucial, diverse embeddings, we pass only the highest quality context to GPT-4o-mini via OpenRouter, resulting in fast, low-cost generations.
+
+---
 
 ## Local Setup
 
@@ -67,4 +96,3 @@ FlashMind utilizes a highly optimized **Retrieval-Augmented Generation (RAG)** p
    python -m backend_flask.app
    ```
    Navigate to `http://127.0.0.1:5000` to access the platform.
-
