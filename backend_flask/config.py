@@ -38,7 +38,7 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() in ('1', 'true', 'yes')
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'default-dev-secret-key')
 RATE_LIMIT_DEFAULT = os.environ.get('RATE_LIMIT_DEFAULT', '10 per hour')
 RATE_LIMIT_STORAGE = os.getenv('RATE_LIMIT_STORAGE', 'memory://')
-DAILY_GENERATION_LIMIT = int(os.environ.get('DAILY_GENERATION_LIMIT', 25))
+DAILY_GENERATION_LIMIT = int(os.environ.get('DAILY_GENERATION_LIMIT', 5))
 
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 OPENROUTER_VISION_MODEL = os.environ.get('OPENROUTER_VISION_MODEL', 'openai/gpt-4o-mini')
