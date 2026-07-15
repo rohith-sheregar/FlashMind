@@ -10,11 +10,16 @@ meaningful chunks with optional overlap.
 """
 
 from pathlib import Path
+import base64
+import mimetypes
+import os
 import re
 import logging
 from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
+TEXT_SUFFIXES = {".txt", ".md", ".markdown"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 _HEADER_PATTERNS = [
     r"^\s*page\s+\d+\b",
@@ -56,9 +61,11 @@ def extract_text_from_file(path: str) -> str:
         raw = _extract_docx_raw(path)
     elif suffix in (".pptx",):
         raw = _extract_pptx_raw(path)
-    elif suffix == ".txt":
+    elif suffix in TEXT_SUFFIXES:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             raw = f.read()
+    elif suffix in IMAGE_SUFFIXES:
+        raw = _extract_image_raw(path)
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
 
@@ -162,6 +169,51 @@ def _extract_pptx_raw(path: str) -> str:
         if bits:
             slide_texts.append(" ".join(bits))
     return "\n\n".join(slide_texts)
+
+
+def _extract_image_raw(path: str) -> str:
+    """Extract study text from an image using the configured OpenRouter vision model."""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("Image uploads require OPENROUTER_API_KEY so the vision model can extract text.")
+
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        logger.exception("openai package is required for image extraction: %s", e)
+        raise
+
+    mime_type = mimetypes.guess_type(path)[0] or "image/png"
+    with open(path, "rb") as image_file:
+        encoded = base64.b64encode(image_file.read()).decode("ascii")
+
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
+    model = os.environ.get("OPENROUTER_VISION_MODEL", "openai/gpt-4o-mini")
+    prompt = (
+        "Extract all readable educational content from this image. "
+        "Include headings, labels, formulas, table text, and diagram relationships. "
+        "If the image is handwritten, transcribe it carefully. "
+        "Return only clean study notes in plain text or Markdown; do not describe the image."
+    )
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{encoded}"}},
+                ],
+            }
+        ],
+        temperature=0.1,
+        max_tokens=2000,
+    )
+    return response.choices[0].message.content or ""
 
 
 # --- Cleaning utilities ---
@@ -325,9 +377,13 @@ def extract_text_chunks(path: str,
         raw = _extract_pptx_raw(path)
         paras = [para.strip() for para in raw.split("\n\n") if para.strip()]
         paragraphs = [{"text": para, "page": None} for para in paras]
-    elif suffix == ".txt":
+    elif suffix in TEXT_SUFFIXES:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             raw = f.read()
+        paras = [para.strip() for para in raw.split("\n\n") if para.strip()]
+        paragraphs = [{"text": para, "page": None} for para in paras]
+    elif suffix in IMAGE_SUFFIXES:
+        raw = _extract_image_raw(path)
         paras = [para.strip() for para in raw.split("\n\n") if para.strip()]
         paragraphs = [{"text": para, "page": None} for para in paras]
     else:

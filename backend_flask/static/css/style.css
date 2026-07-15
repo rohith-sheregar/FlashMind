@@ -27,29 +27,105 @@
       overflow: hidden; 
     }
     
+    /* ---- Mobile (≤768px) ---- */
     @media (max-width: 768px) {
         .mobile-menu-btn { display: block !important; }
-        .app-body { flex-direction: column; }
-        .sidebar { 
-            position: absolute; 
-            top: 73px;
+
+        /* Header: wrap user section below logo on narrow screens */
+        header {
+            padding: 0.75rem 1rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .header-user {
+            gap: 0.5rem;
+            width: 100%;
+            justify-content: flex-end;
+        }
+        #usageStats { display: none !important; }
+        #welcomeText { font-size: 0.85rem; }
+        #logoutBtn { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+
+        /* Layout */
+        .app-body { flex-direction: column; position: relative; }
+
+        /* Sidebar: full-screen overlay */
+        .sidebar {
+            position: fixed;
+            top: 0;
             left: -100%;
-            width: 100%; 
-            height: calc(100vh - 73px);
+            width: 100%;
+            height: 100vh;
             max-height: none !important;
-            z-index: 50;
+            z-index: 200;
             background: var(--bg-base);
-            border-right: none; 
+            border-right: none;
             transition: left 0.3s ease;
         }
         .sidebar.active { left: 0; }
+
+        /* Backdrop when sidebar is open (applied via JS) */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 199;
+        }
+        .sidebar-backdrop.active { display: block; }
+
         .main-content { overflow-y: auto; }
-        .tabs { flex-wrap: wrap; }
-        .tab-btn { padding: 1rem; flex: 1; text-align: center; font-size: 0.9rem; }
-        header { padding: 1rem; }
-        .header-user { gap: 0.5rem; }
-        #usageStats { display: none !important; } /* Hide stats on mobile */
+
+        /* Tabs: horizontal scroll instead of wrapping */
+        .tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            scrollbar-width: none;           /* Firefox */
+        }
+        .tabs::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+        .tab-btn {
+            flex: 0 0 auto;
+            padding: 0.85rem 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        /* Tab panes: less padding on mobile */
+        .tab-pane { padding: 1rem; }
+        .tab-pane h2 { font-size: 1.2rem; }
+
+        /* Flashcard grid: single column on small screens */
         .flashcard-grid { grid-template-columns: 1fr; }
+        .flashcard-wrapper { height: 240px; }
+        .flashcard-face { padding: 1.25rem; }
+        .flashcard-face p { font-size: 0.95rem; }
+
+        /* Quiz: prevent option text overflow */
+        .quiz-option { font-size: 0.9rem; padding: 0.85rem 1rem; word-break: break-word; }
+        .quiz-question { padding: 1.25rem; }
+        .quiz-question h3 { font-size: 1.05rem; }
+
+        /* Markdown topics */
+        .markdown-body { padding: 1.25rem; font-size: 1rem; }
+
+        /* Button sizing */
+        .btn-primary { font-size: 0.85rem; padding: 0.6rem 1rem; }
+
+        /* Upload box */
+        .upload-zone { padding: 1rem; }
+        .upload-box { padding: 1.25rem; }
+    }
+
+    /* Extra-small phones (≤400px) */
+    @media (max-width: 400px) {
+        .tab-btn { padding: 0.7rem 0.75rem; font-size: 0.8rem; }
+        .flashcard-wrapper { height: 220px; }
+        .flashcard-face p { font-size: 0.9rem; }
+        header { padding: 0.5rem 0.75rem; }
     }
     
     .delete-doc-btn {

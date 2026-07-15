@@ -22,8 +22,12 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
             });
             if (res.ok) {
                 const data = await res.json();
+                const limit = data.limit || 25;
                 document.getElementById('usageStats').style.display = 'inline-block';
                 document.getElementById('usageCount').textContent = data.generations_used;
+                // Update the /N part dynamically
+                const statsEl = document.getElementById('usageStats');
+                statsEl.innerHTML = `AI Uses: <span id="usageCount">${data.generations_used}</span>/${limit}`;
             }
         } catch (e) {
             console.error('Failed to fetch user status:', e);
@@ -362,26 +366,49 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
       throw new Error(`The system is currently offline or overloaded. Please try using it later. (Failed after ${maxRetries} attempts)`);
     }
 
-    // Load Decks (Documents)
-    async function loadDecks(autoSelectLatest = false) {
+    // Load Decks (Documents) — with retry for Render cold-start
+    async function loadDecks(autoSelectLatest = false, _retryCount = 0) {
+      const MAX_RETRIES = 2;
+      const RETRY_DELAY = 2000;
       try {
         const res = await fetchWithAuth('/api/list-generated');
-        const data = await res.json();
+        let data;
+        try { data = await res.json(); } catch { data = []; }
+
+        // Handle server error (Mongo cold-start on Render returns 500 { error, records })
+        if (!res.ok) {
+          if (_retryCount < MAX_RETRIES) {
+            console.warn(`loadDecks: server returned ${res.status}, retrying (${_retryCount + 1}/${MAX_RETRIES})...`);
+            await new Promise(r => setTimeout(r, RETRY_DELAY));
+            return loadDecks(autoSelectLatest, _retryCount + 1);
+          }
+          // Exhausted retries — show error with manual retry button
+          deckList.innerHTML = `
+            <div style="padding: 1rem; text-align: center;">
+              <p style="color: var(--danger); margin-bottom: 0.75rem;">Failed to load documents.</p>
+              <button class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="loadDecks()">Retry</button>
+            </div>`;
+          return;
+        }
+
+        // Normalize: API may return an array directly or { records: [] } on error fallback
+        const records = Array.isArray(data) ? data : (Array.isArray(data.records) ? data.records : []);
+
         deckList.innerHTML = '';
-        if (data.length === 0) {
+        if (records.length === 0) {
           deckList.innerHTML = '<p class="empty-state" style="padding:0">No documents yet.</p>';
           return;
         }
         let latestDiv = null;
         let latestRecord = null;
-        data.forEach((record, idx) => {
+        records.forEach((record, idx) => {
           const div = document.createElement('div');
           div.className = 'deck-item';
-          div.style.position = 'relative'; // For absolute positioning of trash icon
+          div.style.position = 'relative';
           
           div.innerHTML = `
             <div class="deck-title" style="padding-right: 20px;">${record.source_file}</div>
-            <div class="deck-meta">${record.flashcards ? record.flashcards.length : 0} cards • ${new Date(record.created_at).toLocaleDateString()}</div>
+            <div class="deck-meta">${record.flashcards ? record.flashcards.length : 0} cards \u2022 ${new Date(record.created_at).toLocaleDateString()}</div>
             <button class="delete-doc-btn" onclick="deleteDocument(event, '${record._id}')" title="Delete Document">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -400,7 +427,18 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
         if (autoSelectLatest && latestDiv) {
            latestDiv.click();
         }
-      } catch(e) { console.error(e); }
+      } catch(e) {
+        console.error('loadDecks failed:', e);
+        if (_retryCount < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, RETRY_DELAY));
+          return loadDecks(autoSelectLatest, _retryCount + 1);
+        }
+        deckList.innerHTML = `
+          <div style="padding: 1rem; text-align: center;">
+            <p style="color: var(--danger); margin-bottom: 0.75rem;">Network error loading documents.</p>
+            <button class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="loadDecks()">Retry</button>
+          </div>`;
+      }
     }
 
     async function deleteDocument(event, recordId) {
@@ -588,53 +626,75 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
     uploadBox.onclick = () => fileInput.click();
     
     fileInput.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
         
         const formData = new FormData();
-        formData.append('file', file);
+        // Append all selected files under the 'files' key (backend reads getlist('files'))
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
         
-        document.getElementById('uploadBox').style.pointerEvents = 'none';
-        document.getElementById('uploadBox').style.opacity = '0.5';
-        document.getElementById('uploadSpinner').style.display = 'inline-block';
+        const uploadBox = document.getElementById('uploadBox');
+        const spinner = document.getElementById('uploadSpinner');
+        uploadBox.style.pointerEvents = 'none';
+        uploadBox.style.opacity = '0.5';
+        spinner.style.display = 'inline-block';
+        
+        // Show file count while uploading
+        const uploadText = uploadBox.querySelector('p');
+        const origText = uploadText ? uploadText.textContent : '';
+        if (uploadText) uploadText.textContent = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`;
         
         try {
             const res = await fetchWithAuth('/api/upload', {
                 method: 'POST',
                 body: formData
-            }, false); // don't set Content-Type header for FormData
+            });
             
             if (res.ok) {
-                await loadDecks(true); // Automatically select the newly uploaded deck
+                await loadDecks(true);
                 if (window.innerWidth <= 768) {
                     document.querySelector('.sidebar').classList.remove('active');
+                    const backdrop = document.querySelector('.sidebar-backdrop');
+                    if (backdrop) backdrop.classList.remove('active');
                 }
             } else {
                 const data = await res.json();
-                alert('Upload failed: ' + data.error);
+                alert('Upload failed: ' + (data.error || 'Unknown error'));
             }
-        } catch(e) {
+        } catch(err) {
             alert('Upload failed. Please try again.');
         } finally {
-            document.getElementById('uploadBox').style.pointerEvents = 'auto';
-            document.getElementById('uploadBox').style.opacity = '1';
-            document.getElementById('uploadSpinner').style.display = 'none';
+            uploadBox.style.pointerEvents = 'auto';
+            uploadBox.style.opacity = '1';
+            spinner.style.display = 'none';
+            if (uploadText) uploadText.textContent = origText;
             document.getElementById('fileInput').value = '';
         }
     };
 
-    // Mobile menu toggle
+    // Mobile menu toggle with backdrop
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     if (mobileMenuBtn) {
-        mobileMenuBtn.onclick = () => {
-            document.querySelector('.sidebar').classList.toggle('active');
-        };
+        // Create backdrop element for mobile sidebar overlay
+        const backdrop = document.createElement('div');
+        backdrop.className = 'sidebar-backdrop';
+        document.body.appendChild(backdrop);
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const isOpen = sidebar.classList.toggle('active');
+            backdrop.classList.toggle('active', isOpen);
+        }
+        mobileMenuBtn.onclick = toggleSidebar;
+        backdrop.onclick = toggleSidebar;
     }
 
     // AI API Callers
 
     // Core AI Call function (still used by individual buttons if they were visible)
-    async function callAI(endpoint, actionType, onSuccess) {
+    async function callAI(endpoint, actionType, onSuccess, force = false) {
       if (!currentRecordId) return alert('Select a document first');
       
       startGenerationOverlay(`Generating ${actionType}...`);
@@ -656,7 +716,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
         const res = await fetchWithRetry(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ record_id: currentRecordId })
+          body: JSON.stringify({ record_id: currentRecordId, force: force })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to generate');
@@ -741,25 +801,29 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 
     // Flashcards
     document.getElementById('generateFlashcardsBtn').onclick = () => {
+      const isRegen = document.getElementById('generateFlashcardsBtn').textContent.includes('Regenerate');
       callAI('/api/generate-flashcards', 'flashcards', (flashcards) => {
         currentFlashcards = flashcards;
         renderFlashcards();
-      });
+      }, isRegen);
     };
 
     // Topics
     document.getElementById('generateTopicsBtn').onclick = () => {
-      callAI('/api/extract-topics', 'topics', (markdown) => renderTopics(markdown));
+      const isRegen = document.getElementById('generateTopicsBtn').textContent.includes('Regenerate');
+      callAI('/api/extract-topics', 'topics', (markdown) => renderTopics(markdown), isRegen);
     };
 
     // Quiz
     document.getElementById('generateQuizBtn').onclick = () => {
-      callAI('/api/generate-quiz', 'quiz', (quizData) => renderQuiz(quizData));
+      const isRegen = document.getElementById('generateQuizBtn').textContent.includes('Regenerate');
+      callAI('/api/generate-quiz', 'quiz', (quizData) => renderQuiz(quizData), isRegen);
     };
 
     // Mindmap
     document.getElementById('generateMindmapBtn').onclick = () => {
-      callAI('/api/generate-mindmap', 'mindmap', async (mermaidText) => await renderMindmap(mermaidText));
+      const isRegen = document.getElementById('generateMindmapBtn').textContent.includes('Regenerate');
+      callAI('/api/generate-mindmap', 'mindmap', async (mermaidText) => await renderMindmap(mermaidText), isRegen);
     };
 
     // Generation Overlay Logic

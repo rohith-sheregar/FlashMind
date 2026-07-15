@@ -8,9 +8,11 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 try:
     from backend_flask.services.db_service import get_mongo_client, MONGO_DB_NAME, get_user_generation_count
     from backend_flask.services.email_service import generate_otp, send_otp_email
+    from backend_flask.config import DAILY_GENERATION_LIMIT
 except ModuleNotFoundError:
     from services.db_service import get_mongo_client, MONGO_DB_NAME, get_user_generation_count
     from services.email_service import generate_otp, send_otp_email
+    from config import DAILY_GENERATION_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -224,4 +226,4 @@ def login():
 def user_status():
     current_user = get_jwt_identity()
     count = get_user_generation_count(current_user)
-    return jsonify({'generations_used': count, 'limit': 5}), 200
+    return jsonify({'generations_used': count, 'limit': DAILY_GENERATION_LIMIT}), 200

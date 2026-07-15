@@ -18,13 +18,16 @@ ML_SERVICE_URL = os.environ.get('ML_SERVICE_URL', 'http://localhost:8000')
 # Uploads / generated paths
 UPLOAD_DIR = os.environ.get('UPLOAD_DIR', str(BASE_DIR / '..' / 'uploads'))
 GENERATED_DIR = os.environ.get('GENERATED_DIR', str(BASE_DIR / '..' / 'generated'))
-MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024 # 10 MB
-MAX_TOTAL_CHARS = 5000000 # 5 million characters
+MAX_UPLOAD_SIZE_BYTES = int(os.environ.get('MAX_UPLOAD_SIZE_BYTES', 10 * 1024 * 1024)) # 10 MB per uploaded file
+MAX_PDF_UPLOAD_SIZE_BYTES = int(os.environ.get('MAX_PDF_UPLOAD_SIZE_BYTES', 10 * 1024 * 1024)) # 10 MB per PDF
+MAX_FILES_PER_DECK = int(os.environ.get('MAX_FILES_PER_DECK', 20))
+MAX_TOTAL_CHARS = int(os.environ.get('MAX_TOTAL_CHARS', 5000000)) # 5 million characters
 
 # Database
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/')
 MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'flashcard_db')
 MONGO_COLLECTION = os.environ.get('MONGO_COLLECTION', 'flashcards')
+MONGO_SERVER_SELECTION_TIMEOUT_MS = int(os.environ.get('MONGO_SERVER_SELECTION_TIMEOUT_MS', 10000))
 
 # Server
 HOST = os.environ.get('HOST', '0.0.0.0')
@@ -35,8 +38,10 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() in ('1', 'true', 'yes')
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'default-dev-secret-key')
 RATE_LIMIT_DEFAULT = os.environ.get('RATE_LIMIT_DEFAULT', '10 per hour')
 RATE_LIMIT_STORAGE = os.getenv('RATE_LIMIT_STORAGE', 'memory://')
+DAILY_GENERATION_LIMIT = int(os.environ.get('DAILY_GENERATION_LIMIT', 25))
 
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+OPENROUTER_VISION_MODEL = os.environ.get('OPENROUTER_VISION_MODEL', 'openai/gpt-4o-mini')
 
 # Email / SMTP (for OTP verification)
 SMTP_EMAIL = os.environ.get('SMTP_EMAIL')

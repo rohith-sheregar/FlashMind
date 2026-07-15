@@ -4,9 +4,11 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 try:
     from backend_flask.services import ai_service
     from backend_flask.services.db_service import get_record_by_id, check_generation_limit
+    from backend_flask.config import DAILY_GENERATION_LIMIT
 except ModuleNotFoundError:
     from services import ai_service
     from services.db_service import get_record_by_id, check_generation_limit
+    from config import DAILY_GENERATION_LIMIT
 
 ai_bp = Blueprint('ai_bp', __name__)
 
@@ -55,8 +57,10 @@ def process_ai_request(action_func, field_name=None):
     if not record or record.get('created_by') != current_user:
         return jsonify({'error': 'Document not found'}), 404
         
+    force_regenerate = bool(data.get('force'))
+
     # Check if the field already exists (cached)
-    if field_name and field_name in record and record[field_name]:
+    if field_name and field_name in record and record[field_name] and not force_regenerate:
         logger.info(f"Returning cached data for {field_name}")
         return jsonify({'data': record[field_name]}), 200
 
@@ -67,16 +71,16 @@ def process_ai_request(action_func, field_name=None):
         from services.db_service import check_generation_limit, increment_generation_count
         
     logger.info("Checking generation limits...")
-    if not check_generation_limit(current_user, limit=5):
+    if not check_generation_limit(current_user, limit=DAILY_GENERATION_LIMIT):
         return jsonify({'error': 'You have reached your daily limit quota. Come back tomorrow!'}), 429
 
-    filepath = record.get('path')
-    logger.info(f"File path: {filepath}")
-    if not filepath:
+    filepaths = record.get('paths') or ([record.get('path')] if record.get('path') else [])
+    logger.info(f"File paths: {filepaths}")
+    if not filepaths:
         return jsonify({'error': 'Document file path missing'}), 404
 
     logger.info("Extracting document text...")
-    text = ai_service.get_document_text(filepath)
+    text = ai_service.get_document_text(filepaths)
     logger.info(f"Text extracted, length: {len(text) if text else 0}")
     if not text:
         return jsonify({'error': 'Could not extract text from document'}), 500

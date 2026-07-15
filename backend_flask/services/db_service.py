@@ -11,6 +11,7 @@ try:
         MONGO_COLLECTION,
         GENERATED_DIR,
         ENABLE_FILE_DB,
+        MONGO_SERVER_SELECTION_TIMEOUT_MS,
     )
 except ModuleNotFoundError:
     from config import (
@@ -19,6 +20,7 @@ except ModuleNotFoundError:
         MONGO_COLLECTION,
         GENERATED_DIR,
         ENABLE_FILE_DB,
+        MONGO_SERVER_SELECTION_TIMEOUT_MS,
     )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ def get_mongo_client():
     if not _mongo_available:
         raise RuntimeError('pymongo not available')
     if _mongo_client is None:
-        _mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
+        _mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=MONGO_SERVER_SELECTION_TIMEOUT_MS)
     return _mongo_client
 
 
@@ -287,7 +289,10 @@ def list_generated(limit: int = 100, username: str = None):
         try:
             return list_generated_mongo(limit=limit, username=username)
         except Exception as e:
-            logger.warning('Failed to list from mongo, falling back to file: %s', e)
-            return list_generated_file(limit=limit, username=username)
+            if ENABLE_FILE_DB:
+                logger.warning('Failed to list from mongo, falling back to file: %s', e)
+                return list_generated_file(limit=limit, username=username)
+            logger.exception('Failed to list from mongo and file DB is disabled')
+            raise
     else:
         return list_generated_file(limit=limit, username=username)
