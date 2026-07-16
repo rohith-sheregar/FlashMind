@@ -74,16 +74,25 @@ def process_ai_request(action_func, field_name=None):
     if not check_generation_limit(current_user, limit=DAILY_GENERATION_LIMIT):
         return jsonify({'error': 'You have reached your daily limit quota. Come back tomorrow!'}), 429
 
-    filepaths = record.get('paths') or ([record.get('path')] if record.get('path') else [])
-    logger.info(f"File paths: {filepaths}")
-    if not filepaths:
-        return jsonify({'error': 'Document file path missing'}), 404
-
     logger.info("Extracting document text...")
-    text = ai_service.get_document_text(filepaths)
+    text = record.get('document_text') or ''
+    if not text:
+        filepaths = record.get('paths') or ([record.get('path')] if record.get('path') else [])
+        logger.info(f"File paths: {filepaths}")
+        existing_paths = [path for path in filepaths if path and os.path.exists(path)]
+        if not existing_paths:
+            return jsonify({
+                'error': 'The original uploaded file is no longer available on the server. Please re-upload this document once; future generations will use saved extracted text.'
+            }), 410
+
+        text = ai_service.get_document_text(existing_paths)
+        if text:
+            record['document_text'] = text
+            save_generated(record)
+
     logger.info(f"Text extracted, length: {len(text) if text else 0}")
     if not text:
-        return jsonify({'error': 'Could not extract text from document'}), 500
+        return jsonify({'error': 'Could not extract text from document'}), 422
 
     try:
         logger.info(f"Calling action_func for {field_name}...")

@@ -20,6 +20,8 @@ def list_generated():
         # allow optional ?limit= param
         limit = int(request.args.get('limit', DEFAULT_PAGE_SIZE))
         records = db_service.list_generated(limit=limit, username=current_user)
+        for record in records:
+            record.pop('document_text', None)
         return jsonify(records)
     except Exception as e:
         # return empty list with 500 for visibility

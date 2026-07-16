@@ -42,8 +42,21 @@
             width: 100%;
             justify-content: flex-end;
         }
-        #usageStats { display: none !important; }
-        #welcomeText { font-size: 0.85rem; }
+        #usageStats {
+            display: inline-flex !important;
+            align-items: center;
+            margin-right: 0 !important;
+            font-size: 0.78rem;
+            padding: 0.2rem 0.45rem !important;
+            white-space: nowrap;
+        }
+        #welcomeText {
+            font-size: 0.85rem;
+            max-width: 38vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         #logoutBtn { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
 
         /* Layout */
@@ -54,7 +67,7 @@
             position: fixed;
             top: 0;
             left: -100%;
-            width: 100%;
+            width: min(88vw, 360px);
             height: 100vh;
             max-height: none !important;
             z-index: 200;

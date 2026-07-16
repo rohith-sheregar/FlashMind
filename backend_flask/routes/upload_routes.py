@@ -218,7 +218,8 @@ def upload() -> Any:
     if not chunks:
         return jsonify({'error': 'no text could be extracted from the document'}), 400
 
-    total_chars = sum(len(c.get('text', '')) for c in chunks)
+    document_text = "\n\n".join(c.get('text', '') for c in chunks if c.get('text'))
+    total_chars = len(document_text)
     if total_chars > MAX_TOTAL_CHARS:
         return jsonify({'error': 'document too large; reduce size or split'}), 413
 
@@ -231,6 +232,7 @@ def upload() -> Any:
         'paths': filepaths,
         'file_count': len(filepaths),
         'total_upload_size': total_upload_size,
+        'document_text': document_text,
         'num_chunks': chunks_processed,
         'flashcards': [],
         'auto_approved': bool(auto_approve),
@@ -302,17 +304,21 @@ def regenerate(record_id: str):
     if not record:
         return jsonify({'error': 'record not found'}), 404
         
-    filepaths = _paths_for_record(record)
-    if not filepaths or any(not os.path.exists(filepath) for filepath in filepaths):
-        return jsonify({'error': 'original file not found'}), 404
-        
-    try:
-        chunks = _extract_chunks_from_paths(filepaths, record.get('source_files'))
-    except Exception as e:
-        logger.exception("Chunk extraction failed: %s", e)
-        return jsonify({'error': 'failed to extract text from file'}), 500
-        
-    full_text = "\n\n".join(c.get('text', '') for c in chunks)
+    full_text = record.get('document_text') or ''
+    if not full_text:
+        filepaths = _paths_for_record(record)
+        if not filepaths or any(not os.path.exists(filepath) for filepath in filepaths):
+            return jsonify({'error': 'original file not found; please re-upload this document'}), 410
+
+        try:
+            chunks = _extract_chunks_from_paths(filepaths, record.get('source_files'))
+        except Exception as e:
+            logger.exception("Chunk extraction failed: %s", e)
+            return jsonify({'error': 'failed to extract text from file'}), 500
+
+        full_text = "\n\n".join(c.get('text', '') for c in chunks)
+        record['document_text'] = full_text
+
     try:
         aggregated = ai_service.generate_flashcards(full_text)
     except Exception as e:

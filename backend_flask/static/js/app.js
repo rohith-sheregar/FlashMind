@@ -23,11 +23,12 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
             if (res.ok) {
                 const data = await res.json();
                 const limit = data.limit || 25;
+                const remaining = Math.max(limit - (data.generations_used || 0), 0);
                 document.getElementById('usageStats').style.display = 'inline-block';
                 document.getElementById('usageCount').textContent = data.generations_used;
                 // Update the /N part dynamically
                 const statsEl = document.getElementById('usageStats');
-                statsEl.innerHTML = `AI Uses: <span id="usageCount">${data.generations_used}</span>/${limit}`;
+                statsEl.innerHTML = `Credits: <span id="usageCount">${remaining}</span>/${limit}`;
             }
         } catch (e) {
             console.error('Failed to fetch user status:', e);
@@ -534,7 +535,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
       renderFlashcards();
       
       if (window.innerWidth <= 768) {
-          document.querySelector('.sidebar').classList.remove('active');
+          closeMobileSidebar();
       }
     }
 
@@ -655,9 +656,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
             if (res.ok) {
                 await loadDecks(true);
                 if (window.innerWidth <= 768) {
-                    document.querySelector('.sidebar').classList.remove('active');
-                    const backdrop = document.querySelector('.sidebar-backdrop');
-                    if (backdrop) backdrop.classList.remove('active');
+                    closeMobileSidebar();
                 }
             } else {
                 const data = await res.json();
@@ -674,6 +673,13 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
         }
     };
 
+    function closeMobileSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (sidebar) sidebar.classList.remove('active');
+        if (backdrop) backdrop.classList.remove('active');
+    }
+
     // Mobile menu toggle with backdrop
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     if (mobileMenuBtn) {
@@ -688,7 +694,10 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
             backdrop.classList.toggle('active', isOpen);
         }
         mobileMenuBtn.onclick = toggleSidebar;
-        backdrop.onclick = toggleSidebar;
+        backdrop.onclick = closeMobileSidebar;
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeMobileSidebar();
+        });
     }
 
     // AI API Callers
@@ -718,7 +727,15 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' });
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ record_id: currentRecordId, force: force })
         });
-        const data = await res.json();
+        const contentType = res.headers.get('content-type') || '';
+        let data;
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const rawText = await res.text();
+          const shortText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220);
+          throw new Error(shortText || `Server returned ${res.status} without JSON.`);
+        }
         if (!res.ok) throw new Error(data.error || 'Failed to generate');
         
         clearInterval(progressInterval);

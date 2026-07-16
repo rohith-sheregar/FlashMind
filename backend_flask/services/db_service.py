@@ -65,7 +65,13 @@ def check_duplicate(filename: str, username: str) -> bool:
         client = get_mongo_client()
         db = client.get_database(MONGO_DB_NAME)
         col = db.get_collection(MONGO_COLLECTION)
-        return col.find_one({'source_file': filename, 'created_by': username}) is not None
+        record = col.find_one({'source_file': filename, 'created_by': username})
+        if not record:
+            return False
+        if record.get('document_text'):
+            return True
+        filepaths = record.get('paths') or ([record.get('path')] if record.get('path') else [])
+        return any(path and os.path.exists(path) for path in filepaths)
     except Exception:
         return False
 
@@ -84,8 +90,10 @@ def delete_record(record_id: str, username: str) -> bool:
             return False
             
         # Delete file if exists
-        filepath = record.get('path')
-        if filepath and os.path.exists(filepath):
+        filepaths = record.get('paths') or ([record.get('path')] if record.get('path') else [])
+        for filepath in filepaths:
+            if not filepath or not os.path.exists(filepath):
+                continue
             try:
                 os.remove(filepath)
             except Exception as e:
